@@ -697,7 +697,7 @@ export class World {
   private placeNightLights() {
     const night = this.theme === 'dark';
     const spots = night
-      ? [...[...this.rooms.values()].map((r) => r.center.clone().setY(2.9)), ...this.building.lightSpots()]
+      ? [...[...this.rooms.values()].filter((r) => !r.empty).map((r) => r.center.clone().setY(2.9)), ...this.building.lightSpots()]
       : [];
     const t = this.controls.target;
     spots.sort((a, b) => a.distanceToSquared(t) - b.distanceToSquared(t));

@@ -7,6 +7,7 @@ import { hash, STATUS_COLORS, teamAccent, teamColor, type ThemeName } from './pa
 import { CORRIDOR, OFFICE_D, type RoomLayout } from './layout';
 import {
   armchair,
+  bulbMat,
   beanbag,
   bookshelf,
   boxes,
@@ -34,6 +35,8 @@ import { fit, makeCanvas, MONO_FONT, UI_FONT, wrap } from './text';
 
 const boardGeo = new PlaneGeometry(1.5, 0.95);
 const hitMat = new MeshBasicMaterial({ visible: false });
+/** Bulbs of an empty room: switched off. */
+const offBulbMat = new MeshBasicMaterial({ color: '#4a463f' });
 
 /**
  * One team's office inside the building. Owns the carpet, furniture, the
@@ -45,6 +48,8 @@ export class TeamRoom {
   readonly id: string;
   /** Room-local container for desks and characters. */
   readonly floor = new Group();
+  /** No agents inside: lights off (also skipped by the night lights). */
+  empty = false;
   private decor: Group | null = null;
   private carpetMat: MeshStandardMaterial;
   private rugMat: MeshStandardMaterial;
@@ -220,6 +225,10 @@ export class TeamRoom {
     const signKey = `${team.name}|${agents.length}|${dark}`;
     if (signKey !== this.signKey) {
       this.signKey = signKey;
+      this.empty = agents.length === 0;
+      this.decor?.traverse((o) => {
+        if (o instanceof Mesh && (o.material === bulbMat || o.material === offBulbMat)) o.material = this.empty ? offBulbMat : bulbMat;
+      });
       const accent = teamAccent(team.hue).getStyle();
       // Door sign: dark plate, light text.
       {

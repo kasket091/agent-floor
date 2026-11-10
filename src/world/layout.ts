@@ -107,12 +107,13 @@ export class SeatBook {
     for (const [teamId, map] of this.slots) {
       const present = new Set((byTeam.get(teamId) || []).map((a) => a.id));
       for (const id of map.keys()) if (!present.has(id)) map.delete(id);
-      if (!byTeam.has(teamId)) {
-        this.slots.delete(teamId);
-        this.wings.delete(teamId);
-      }
+      if (!byTeam.has(teamId)) this.slots.delete(teamId);
       const lead = this.leads.get(teamId);
       if (lead && !present.has(lead)) this.leads.delete(teamId);
+    }
+    // Pinned rooms keep their wing while empty, so they never jump sides.
+    for (const teamId of this.wings.keys()) {
+      if (!byTeam.has(teamId) && !state.teams[teamId]?.pinned) this.wings.delete(teamId);
     }
     for (const [teamId, agents] of byTeam) {
       agents.sort((a, b) => a.joinedAt - b.joinedAt || a.id.localeCompare(b.id));
@@ -165,7 +166,9 @@ type Draft = Omit<RoomLayout, 'x' | 'z' | 'yaw' | 'entry'>;
 
 export function computeLayout(state: WorldState, book: SeatBook): BuildingLayout {
   book.assign(state);
-  const teams = Object.values(state.teams).sort((a, b) => a.order - b.order);
+  // Lobby first, then rooms A-Z by name, so site rooms read like a directory.
+  const rank = (t: Team) => (t.id === 'lobby' ? 0 : 1);
+  const teams = Object.values(state.teams).sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
 
   // --- size every office and place it in a wing
   const wing: Record<'north' | 'south', Draft[]> = { north: [], south: [] };
