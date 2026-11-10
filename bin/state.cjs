@@ -17,6 +17,10 @@ function snooze(hours) {
   fs.writeFileSync(SNOOZE, String(Date.now() + hours * 3600_000));
 }
 
+function unsnooze() {
+  fs.rmSync(SNOOZE, { force: true });
+}
+
 function isSnoozed() {
   try {
     return Date.now() < Number(fs.readFileSync(SNOOZE, 'utf8'));
@@ -46,4 +50,4 @@ function takeLaunchLock(staleMs = 20_000) {
   }
 }
 
-module.exports = { DIR, snooze, isSnoozed, takeLaunchLock };
+module.exports = { DIR, snooze, unsnooze, isSnoozed, takeLaunchLock };

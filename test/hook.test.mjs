@@ -20,6 +20,7 @@ const FALLBACK = `${SELF} hook claude`;
 
 after(() => {
   spawnSync('pkill', ['-f', FALLBACK]);
+  spawnSync('pkill', ['-f', `${SELF} start`]);
   fs.rmSync(tmp, { recursive: true, force: true });
 });
 
@@ -33,10 +34,10 @@ const freePort = () =>
   });
 
 // Async, not spawnSync: the in-test floor shares this event loop and must answer while the hook runs.
-function runHook(port, payload) {
+function runHook(port, payload, extraEnv = {}) {
   return new Promise((done) => {
     const t0 = performance.now();
-    const child = spawn('/bin/sh', ['-c', claudeHookCommand(port, SELF)], { env: { ...env, AGENT_FLOOR_PORT: String(port) } });
+    const child = spawn('/bin/sh', ['-c', claudeHookCommand(port, SELF)], { env: { ...env, AGENT_FLOOR_PORT: String(port), ...extraEnv } });
     let stdout = '';
     child.stdout.setEncoding('utf8').on('data', (d) => (stdout += d));
     child.on('close', (status) => done({ status, stdout, ms: performance.now() - t0 }));
@@ -182,4 +183,51 @@ test('setup refuses to run from an npx cache', () => {
   assert.notEqual(r.status, 0);
   assert.match(r.stderr, /npx/);
   assert.ok(!fs.existsSync(join(home, '.claude', 'settings.json')));
+});
+
+test('after stop, hooks do not relaunch the floor; agent-floor clears that and opens it', async () => {
+  const port = await freePort();
+  const fakeBin = fs.mkdtempSync(join(tmp, 'bin-'));
+  const opened = join(fakeBin, 'opened.log');
+  // A stub `open` (macOS window/browser launcher) on PATH: records calls, never opens a real browser.
+  fs.writeFileSync(join(fakeBin, 'open'), `#!/bin/sh\necho "$@" >> "${opened}"\n`, { mode: 0o755 });
+  const e = {
+    AGENT_FLOOR_PORT: String(port),
+    AGENT_FLOOR_HOME: fs.mkdtempSync(join(tmp, 'state-')),
+    AGENT_FLOOR_AUTOLAUNCH: '1',
+    PATH: `${fakeBin}:${process.env.PATH}`,
+  };
+  const health = () => fetch(`http://127.0.0.1:${port}/health`).then((res) => res.ok, () => false);
+  const child = spawn(process.execPath, [SELF, 'start', '--port', String(port)], { env: { ...env, ...e }, stdio: 'ignore' });
+  const exited = new Promise((r) => child.once('exit', r));
+  try {
+    let up = false;
+    for (let i = 0; i < 50 && !up; i++) {
+      await sleep(100);
+      up = await health();
+    }
+    assert.ok(up, 'floor did not start');
+    const r = cli(['stop'], e);
+    assert.equal(r.status, 0, r.stderr);
+    await exited;
+
+    const h = await runHook(port, { session_id: 'after-stop', hook_event_name: 'PostToolUse', cwd: tmp, tool_name: 'Bash', tool_input: { command: 'agent-floor stop' } }, e);
+    assert.equal(h.status, 0);
+    assert.equal(h.stdout, '');
+    await sleep(4500); // longer than the fallback's launch-and-wait
+    assert.equal(await health(), false, 'a hook relaunched the floor after stop');
+    assert.ok(!fs.existsSync(opened), 'a hook opened a window after stop');
+    assert.match(r.stdout, /run agent-floor/i, 'stop says how to open it again');
+
+    // Opening it by hand still works while snoozed, and lifts the snooze.
+    const app = cli(['app', '--browser'], e);
+    assert.equal(app.status, 0, app.stderr);
+    assert.equal(await health(), true);
+    for (let i = 0; i < 20 && !fs.existsSync(opened); i++) await sleep(100); // the launcher is spawned detached
+    assert.ok(fs.existsSync(opened), 'agent-floor did not open a window');
+    assert.ok(!fs.existsSync(join(e.AGENT_FLOOR_HOME, 'snoozed-until')));
+  } finally {
+    child.kill();
+    cli(['stop'], e);
+  }
 });

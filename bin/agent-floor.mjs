@@ -149,6 +149,7 @@ async function openApp({ browser = false } = {}) {
 
 async function app(args) {
   const f = flags(args);
+  require('./state.cjs').unsnooze(); // opened by hand: hooks may reopen it again (undoes stop / quiet)
   const how = await openApp({ browser: Boolean(f.browser) });
   console.log(
     how === 'app-window'
@@ -370,7 +371,10 @@ async function stop() {
     body: '{}',
     signal: AbortSignal.timeout(2000),
   }).catch(() => null);
+  // Otherwise the next hook (even the one for this very command) relaunches it.
+  require('./state.cjs').snooze(6);
   console.log(res?.ok ? `Stopped the floor at ${URL_BASE}.` : `No floor was running at ${URL_BASE}.`);
+  console.log('Hooks will not reopen it for 6 hours. Run agent-floor to open it again.');
 }
 
 // ---------------------------------------------------------------- demo
