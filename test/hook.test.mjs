@@ -174,6 +174,30 @@ test('setup claude --write keeps other hooks, replaces old Agent Floor entries, 
   assert.ok(fs.existsSync(`${path}.bak`));
 });
 
+test('setup claude --write keeps another tool\'s hook that shares a group with an old Agent Floor command', () => {
+  const home = fs.mkdtempSync(join(tmp, 'home-'));
+  const path = join(home, '.claude', 'settings.json');
+  fs.mkdirSync(dirname(path), { recursive: true });
+  const theirs = { type: 'command', command: '/usr/local/bin/other-tool log --tool', timeout: 5 };
+  const mixed = { matcher: 'Bash', hooks: [theirs, { type: 'command', command: 'npx -y agent-floor hook claude' }] };
+  const lone = { matcher: 'Edit', hooks: [{ type: 'command', command: 'echo lone' }] };
+  fs.writeFileSync(path, JSON.stringify({ model: 'x', env: { A: '1' }, hooks: { PreToolUse: [mixed, lone], Stop: [lone] } }));
+
+  assert.equal(cli(['setup', 'claude', '--write'], { HOME: home }).status, 0);
+
+  const settings = JSON.parse(fs.readFileSync(path, 'utf8'));
+  assert.equal(settings.model, 'x');
+  assert.deepEqual(settings.env, { A: '1' });
+  const pre = settings.hooks.PreToolUse;
+  assert.deepEqual(pre[0], { matcher: 'Bash', hooks: [theirs] }, 'the other tool\'s hook is kept exactly, ours removed');
+  assert.deepEqual(pre[1], lone);
+  assert.deepEqual(settings.hooks.Stop[0], lone);
+  assert.ok(!JSON.stringify(settings).includes('npx'));
+  const added = claudeHooks();
+  assert.deepEqual(pre.slice(2), added.PreToolUse, 'the new Agent Floor entry is added');
+  assert.deepEqual(settings.hooks.Stop.slice(1), added.Stop);
+});
+
 test('setup refuses to run from an npx cache', () => {
   const home = fs.mkdtempSync(join(tmp, 'home-'));
   const bin = join(tmp, '_npx', 'abc', 'bin');

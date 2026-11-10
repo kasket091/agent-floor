@@ -277,8 +277,17 @@ async function backupAndWrite(path, data) {
   await writeFile(path, JSON.stringify(data, null, 2) + '\n');
 }
 
-function isOurs(entry) {
-  return JSON.stringify(entry).includes('agent-floor');
+const isOurs = (hook) => String(hook?.command ?? '').includes('agent-floor');
+
+// Removes our commands hook by hook, so a matcher group shared with another tool keeps that tool's hook.
+// A group is dropped only when removing ours left it empty. Cursor entries are flat { command }.
+function withoutOurs(entries) {
+  return (entries || []).flatMap((e) => {
+    if (!Array.isArray(e?.hooks)) return isOurs(e) ? [] : [e];
+    const hooks = e.hooks.filter((h) => !isOurs(h));
+    if (hooks.length === e.hooks.length) return [e];
+    return hooks.length ? [{ ...e, hooks }] : [];
+  });
 }
 
 async function setup(args) {
@@ -299,7 +308,7 @@ async function setup(args) {
     const settings = await readJsonFile(path);
     settings.hooks ||= {};
     for (const [event, entries] of Object.entries(hooks)) {
-      const kept = (settings.hooks[event] || []).filter((e) => !isOurs(e));
+      const kept = withoutOurs(settings.hooks[event]);
       settings.hooks[event] = [...kept, ...entries];
     }
     await backupAndWrite(path, settings);
@@ -316,7 +325,7 @@ async function setup(args) {
     current.version ||= 1;
     current.hooks ||= {};
     for (const [event, entries] of Object.entries(config.hooks)) {
-      const kept = (current.hooks[event] || []).filter((e) => !isOurs(e));
+      const kept = withoutOurs(current.hooks[event]);
       current.hooks[event] = [...kept, ...entries];
     }
     await backupAndWrite(path, current);
