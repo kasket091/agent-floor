@@ -14,14 +14,21 @@ Works with **Claude Code**, **Codex**, **Cursor**, and anything else that can se
 
 ## Quick start
 
+Agent Floor installs from source. It is not published to npm.
+
 ```bash
-npm i -g agent-floor
-agent-floor setup claude --write
+git clone https://github.com/develop212/agent-floor
+cd agent-floor
+npm ci
+npm run build
+node bin/agent-floor.mjs setup claude --write
 ```
 
-That's it. The next time a Claude Code session starts, Agent Floor opens by itself in its own desktop window (no browser). Close the window and it keeps listening from the menu bar; use **Quit (pause auto-open for 6 hours)** in the menu bar icon when you want quiet. Run `agent-floor` any time to open it yourself.
+That's it. The next time a Claude Code session starts, Agent Floor opens by itself in a Chrome, Edge or Brave app window (or your default browser). Closing the window leaves the floor running. Run `agent-floor quiet [hours]` when you want quiet, or `agent-floor stop` to stop it. Run `agent-floor` any time to open it yourself.
 
-Start a Claude Code session in any project. A character walks into a room named after the project folder, sits down, and starts working. When it spawns a subagent, a new teammate walks in, gets briefed with a paper plane, works at its own desk, and reports back.
+The commands below say `agent-floor`. Run `npm link` once in the repo to get that command, or use `node bin/agent-floor.mjs` in its place.
+
+Start a Claude Code session in any project. A character walks into the Lobby, sits down, and starts working. Each WordPress site you have connected as an MCP server gets its own room, and the session moves there when it touches that site. When it spawns a subagent, a new teammate walks in, gets briefed with a paper plane, works at its own desk, and reports back.
 
 No agents yet? Click **Watch demo**, or run `agent-floor demo` in a second terminal.
 
@@ -29,7 +36,7 @@ No agents yet? Click **Watch demo**, or run `agent-floor demo` in a second termi
 
 | On the floor | Means |
 | --- | --- |
-| An office block | One project, or whatever `team` you send. Name above the door and on the corridor floor, current task on the rolling whiteboard. |
+| An office block | The Lobby, or one WordPress site. Name above the door and on the corridor floor. The whiteboard shows the lead's current task-list step. |
 | Character at a desk | One agent. The lead sits at the head of the desk pod. |
 | Typing, code scrolling on the monitor | `working`: running a tool. The screen shows the tool and what it is doing. |
 | Hand on chin, thought bubble | `thinking` |
@@ -49,9 +56,13 @@ Coloured magnets on each whiteboard show every team member's status at a glance.
 ### Claude Code
 
 ```bash
-agent-floor setup claude --write     # merges hooks into ~/.claude/settings.json (backup kept)
+agent-floor setup claude --write     # merges hooks into ~/.claude/settings.json
 agent-floor setup claude --project   # prints a snippet for .claude/settings.json in this repo
 ```
+
+Setup backs up your settings first, as `settings.json.before-agent-floor-<YYYY-MM-DD>` and `settings.json.bak`. Each hook is a `curl` one-liner that posts to `POST /hooks/claude`. If the floor is down, it starts it in the background with Node instead.
+
+Rooms come from `~/.claude.json`. Every MCP server whose URL contains `/wp-json/` gets a pinned room named after it. Only the names and URLs are read. Everything else goes in the Lobby.
 
 Uses `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Notification`, `Stop`, `SubagentStop`, `PreCompact` and `SessionEnd`. Subagents spawned with the Task tool get their own desks and their tool calls show up on their own screens.
 
@@ -101,8 +112,7 @@ The full event format is in [docs/protocol.md](docs/protocol.md). More integrati
 | `AGENT_FLOOR_TEAM` | project folder name | hooks: put this session in a named room |
 | `AGENT_FLOOR_NAME` | `Claude`, `Codex`, `Cursor` | hooks: the lead's display name |
 | `AGENT_FLOOR_AUTOLAUNCH` | `1` | set to `0` so hooks never open the app |
-
-Group several repos into one room by giving them the same `AGENT_FLOOR_TEAM`.
+| `AGENT_FLOOR_CLAUDE_CONFIG` | `~/.claude.json` | server: where to read WordPress MCP connections for site rooms |
 
 ## Privacy and safety
 
@@ -110,10 +120,15 @@ Group several repos into one room by giving them the same `AGENT_FLOOR_TEAM`.
 - `POST` requires `Content-Type: application/json`, so web pages cannot fire simple cross-site requests at it. CORS is limited to localhost origins.
 - Hooks time out after 1.2 seconds, swallow every error and always exit 0. If the floor is down, your agents never notice.
 - Nothing is stored on disk and nothing is sent anywhere else. Activity text is clipped to 280 characters.
+- Secrets in displayed text, such as tokens and passwords, show as `•••`.
+- From `~/.claude.json` the floor reads only MCP server names and URLs.
 
-## The desktop app
+## The app window
 
-`agent-floor` (or the first hook event when nothing is running) starts the floor and opens it as an Electron window. If Electron is not available, it falls back to a Chrome or Edge app window, and then to your default browser. Only one copy ever runs: parallel subagents share a launch lock. `agent-floor start` runs just the server, with no window, if you prefer a browser tab at http://localhost:4317.
+`agent-floor` (or the first hook event when nothing is running) starts the floor and opens it in a Chrome, Edge or Brave app window. If none is installed, it opens your default browser. Only one copy ever runs: parallel subagents share a launch lock. `agent-floor start` runs just the server, with no window, if you prefer a browser tab at http://localhost:4317.
+
+- `agent-floor quiet [hours]`: hooks don't open the floor for a while (default 6 hours).
+- `agent-floor stop`: stops the floor and pauses auto-open for 6 hours. Run `agent-floor` to open it again.
 
 ## Performance
 
@@ -129,19 +144,18 @@ agent-floor emit, curl, your code ───┼──► POST /events ──► r
                                         map native payloads     same reducer runs on both sides
 ```
 
-- `server/` is a zero-dependency Node HTTP server. `npx agent-floor` installs nothing else.
+- `server/` is a zero-dependency Node HTTP server. It needs nothing beyond Node.
 - `shared/protocol.js` is the event reducer, used verbatim by the server and the browser, so a snapshot plus the stream always matches.
 - `adapters/` turn each tool's hook payload into floor events. They are pure functions with tests.
 - `src/world/` is the three.js scene: rooms, desks, characters, paper planes and the camera rig.
 - `src/ui/` is the HUD: name tags, speech bubbles, the agent card and the connect sheet.
-- `desktop/` is the Electron shell: native window, tray icon, single instance, auto-launch state.
 
 ## Develop
 
 ```bash
 git clone https://github.com/develop212/agent-floor
 cd agent-floor
-npm install
+npm ci
 npm run dev        # floor server on :4317 + Vite on :5173
 npm run demo       # in another terminal, stream fake agents
 npm test           # protocol, adapters, server
@@ -149,6 +163,8 @@ npm run build      # typecheck + production build into dist/
 ```
 
 `npm run build:pages` builds a demo-only version into `dist-pages/` for GitHub Pages. The included workflow publishes it on every push to `main`.
+
+`scripts/capture.cjs` and `scripts/record.cjs` take screenshots and clips for the docs. They need Electron, which is not a dependency: install it separately to use them.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for how the scene is put together and what makes a good adapter.
 

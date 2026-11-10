@@ -5,11 +5,13 @@ Thanks for helping. Agent Floor is small on purpose: a zero-dependency server, a
 ## Setup
 
 ```bash
-npm install
+npm ci
 npm run dev      # server on :4317, Vite on :5173 (proxies /events and /stream)
 npm run demo     # in another terminal
 npm test
 ```
+
+`scripts/capture.cjs` and `scripts/record.cjs` are dev-only and need Electron installed separately.
 
 Open http://localhost:5173. Add `?demo` to run the demo inside the browser without a server.
 
@@ -20,7 +22,7 @@ Open http://localhost:5173. Add `?demo` to run the demo inside the browser witho
 | `shared/protocol.js` | Event validation and the reducer. Runs on the server and in the browser. Change it with care and add tests. |
 | `shared/demo-script.js` | The endless fake office used by `agent-floor demo` and the hosted demo. |
 | `server/index.mjs` | HTTP + SSE. No dependencies. |
-| `bin/agent-floor.mjs` | CLI: `start`, `setup`, `hook`, `emit`, `demo`. |
+| `bin/agent-floor.mjs` | CLI: `start`, `setup`, `hook`, `emit`, `demo`, `quiet`, `stop`. |
 | `adapters/` | Native hook payloads to floor events. Pure functions. |
 | `src/world/layout.ts` | The floor plan: lobby, corridor, office wings, amenities, desks and walking routes. Seats and wings are stable once assigned. |
 | `src/world/Building.ts` | The shell and shared spaces: walls, windows, doors, lobby, kitchen, meeting room, lounge, garden. |
