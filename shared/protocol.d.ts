@@ -1,5 +1,5 @@
 export type Status = 'idle' | 'thinking' | 'working' | 'waiting' | 'done' | 'error' | 'offline';
-export type EventType = 'join' | 'status' | 'tool' | 'message' | 'task' | 'leave' | 'reset';
+export type EventType = 'join' | 'status' | 'tool' | 'message' | 'task' | 'leave' | 'reset' | 'rooms';
 
 /** What clients POST to /events. Only `type` and `agent` are required. */
 export interface InboundEvent {
@@ -36,6 +36,8 @@ export interface FloorEvent {
   text?: string;
   task?: string;
   to?: string[];
+  /** Only on `rooms` events. */
+  rooms?: { id: string; name: string }[];
 }
 
 export interface HistoryEntry {
@@ -70,6 +72,8 @@ export interface Team {
   order: number;
   task?: string;
   createdAt: number;
+  /** Kept on the floor while empty (set by the `rooms` event). */
+  pinned?: boolean;
 }
 
 export interface WorldState {

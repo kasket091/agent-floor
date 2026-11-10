@@ -12,7 +12,7 @@ Only `type` and `agent` are required. Any event creates the agent and its team i
 
 | Field | Type | Notes |
 | --- | --- | --- |
-| `type` | `join` `status` `tool` `message` `task` `leave` `reset` | What happened. |
+| `type` | `join` `status` `tool` `message` `task` `leave` `reset` `rooms` | What happened. |
 | `agent` | string, or `{ id, name?, role?, source? }` | Stable id for this agent. Reuse it for every event. |
 | `name` | string | Display name. Defaults to a tidied version of the id. |
 | `role` | string | Shown under the name and decides shirt colour. `Lead` gets the head desk and a headset. |
@@ -37,10 +37,11 @@ Only `type` and `agent` are required. Any event creates the agent and its team i
 - **task**: update the team whiteboard.
 - **leave**: the agent stands up and walks out. It is removed a few seconds later.
 - **reset**: clear the whole floor.
+- **rooms**: `{ "type": "rooms", "rooms": [{ "id": "penrithplastering.com.au", "name": "Penrith Plastering" }] }`. No `agent` needed. Pins one room per entry (up to 64; ids are slugged, so this one is `penrithplastering-com-au`, names clipped to 48 chars). Each event replaces the pinned set: rooms not listed are unpinned.
 
 ## Lifetime
 
-The server forgets agents that have left after 6 seconds, helpers (agents with a `parent`) 45 seconds after they finish with `done`, and anything silent for 2 hours. Empty rooms disappear with their last agent.
+The server forgets agents that have left after 6 seconds, helpers (agents with a `parent`) 45 seconds after they finish with `done`, and anything silent for 2 hours. Empty rooms disappear with their last agent, unless pinned by a `rooms` event.
 
 ## Subagent hints
 

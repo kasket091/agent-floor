@@ -82,3 +82,37 @@ test('sweep removes departed agents and empty teams', () => {
   assert.deepEqual(sweep(s, 1000 + 60_000), ['a']);
   assert.equal(Object.keys(s.teams).length, 0);
 });
+
+test('rooms pins a room per site that survives sweep while empty', () => {
+  const s = createState();
+  run(s, { type: 'rooms', rooms: [{ id: 'penrithplastering.com.au', name: 'Penrith Plastering' }] });
+  const room = s.teams['penrithplastering-com-au'];
+  assert.ok(room);
+  assert.equal(room.pinned, true);
+  assert.equal(room.name, 'Penrith Plastering');
+  assert.equal(Object.keys(s.agents).length, 0);
+  sweep(s);
+  assert.ok(s.teams['penrithplastering-com-au']);
+});
+
+test('a later rooms event without a room unpins it and sweep removes it', () => {
+  const s = createState();
+  run(s, { type: 'rooms', rooms: [{ id: 'penrithplastering.com.au', name: 'Penrith Plastering' }] });
+  run(s, { type: 'rooms', rooms: [{ id: 'other.com', name: 'Other' }] });
+  assert.equal(s.teams['penrithplastering-com-au'].pinned, false);
+  sweep(s);
+  assert.equal(s.teams['penrithplastering-com-au'], undefined);
+  assert.ok(s.teams['other-com']);
+});
+
+test('an unpinned empty team is still removed by sweep', () => {
+  const s = createState();
+  run(s, { type: 'join', agent: 'a', team: 'Gone' });
+  run(s, { type: 'leave', agent: 'a' });
+  sweep(s, Date.now() + 10_000);
+  assert.equal(s.teams.gone, undefined);
+});
+
+test('rooms normalises bad input to an empty list', () => {
+  assert.deepEqual(normalizeEvent({ type: 'rooms', rooms: 'x' }), { type: 'rooms', rooms: [] });
+});

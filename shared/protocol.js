@@ -6,7 +6,7 @@ export const PROTOCOL_VERSION = 1;
 
 export const STATUSES = ['idle', 'thinking', 'working', 'waiting', 'done', 'error', 'offline'];
 
-export const EVENT_TYPES = ['join', 'status', 'tool', 'message', 'task', 'leave', 'reset'];
+export const EVENT_TYPES = ['join', 'status', 'tool', 'message', 'task', 'leave', 'reset', 'rooms'];
 
 const MAX_HISTORY = 24;
 const MAX_TEXT = 280;
@@ -44,6 +44,14 @@ export function normalizeEvent(raw, now = Date.now()) {
   const type = EVENT_TYPES.includes(raw.type) ? raw.type : null;
   if (!type) return null;
   if (type === 'reset') return { type, ts: now };
+  if (type === 'rooms') {
+    const list = Array.isArray(raw.rooms) ? raw.rooms : [];
+    const rooms = list
+      .filter((r) => r && typeof r === 'object' && r.id != null)
+      .slice(0, 64)
+      .map((r) => ({ id: slug(r.id), name: clip(r.name ?? r.id, 48) }));
+    return { type, rooms };
+  }
 
   const agentRaw = typeof raw.agent === 'object' && raw.agent ? raw.agent : { id: raw.agent };
   const agentId = agentRaw.id != null ? String(agentRaw.id).slice(0, 128) : null;
@@ -187,6 +195,13 @@ export function applyEvent(state, rawEv) {
     return { state, effects };
   }
 
+  if (rawEv.type === 'rooms') {
+    const listed = new Set(rawEv.rooms.map((r) => r.id));
+    for (const r of rawEv.rooms) ensureTeam(state, r.id, r.name, now).pinned = true;
+    for (const team of Object.values(state.teams)) if (!listed.has(team.id)) team.pinned = false;
+    return { state, effects };
+  }
+
   const ev = resolveSubagent(state, rawEv);
   const existed = Boolean(state.agents[ev.agent]);
   const agent = ensureAgent(state, ev, now);
@@ -272,6 +287,6 @@ export function sweep(
     }
   }
   const used = new Set(Object.values(state.agents).map((a) => a.team));
-  for (const id of Object.keys(state.teams)) if (!used.has(id)) delete state.teams[id];
+  for (const id of Object.keys(state.teams)) if (!used.has(id) && !state.teams[id].pinned) delete state.teams[id];
   return removed;
 }
