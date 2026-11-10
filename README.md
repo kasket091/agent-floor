@@ -17,7 +17,7 @@ Works with **Claude Code**, **Codex**, **Cursor**, and anything else that can se
 Agent Floor installs from source. It is not published to npm.
 
 ```bash
-git clone https://github.com/develop212/agent-floor
+git clone https://github.com/kasket091/agent-floor
 cd agent-floor
 npm ci
 npm run build
@@ -109,7 +109,7 @@ The full event format is in [docs/protocol.md](docs/protocol.md). More integrati
 | `AGENT_FLOOR_PORT` | `4317` | server, hooks |
 | `AGENT_FLOOR_HOST` | `127.0.0.1` | server |
 | `AGENT_FLOOR_URL` | `http://127.0.0.1:4317` | hooks, `emit`, `demo` |
-| `AGENT_FLOOR_TEAM` | project folder name | hooks: put this session in a named room |
+| `AGENT_FLOOR_TEAM` | Claude Code: the Lobby (site rooms still apply). Codex, Cursor: project folder name | hooks: put this session in a named room |
 | `AGENT_FLOOR_NAME` | `Claude`, `Codex`, `Cursor` | hooks: the lead's display name |
 | `AGENT_FLOOR_AUTOLAUNCH` | `1` | set to `0` so hooks never open the app |
 | `AGENT_FLOOR_CLAUDE_CONFIG` | `~/.claude.json` | server: where to read WordPress MCP connections for site rooms |
@@ -118,7 +118,7 @@ The full event format is in [docs/protocol.md](docs/protocol.md). More integrati
 
 - The server binds to `127.0.0.1` and only answers loopback host names.
 - `POST` requires `Content-Type: application/json`, so web pages cannot fire simple cross-site requests at it. CORS is limited to localhost origins.
-- Hooks time out after 1.2 seconds, swallow every error and always exit 0. If the floor is down, your agents never notice.
+- The Claude hook's `curl` gives up after 1 second and the fallback runs in the background. Hooks swallow every error and always exit 0. If the floor is down, your agents never notice.
 - Nothing is stored on disk and nothing is sent anywhere else. Activity text is clipped to 280 characters.
 - Secrets in displayed text, such as tokens and passwords, show as `•••`.
 - From `~/.claude.json` the floor reads only MCP server names and URLs.
@@ -153,7 +153,7 @@ agent-floor emit, curl, your code ───┼──► POST /events ──► r
 ## Develop
 
 ```bash
-git clone https://github.com/develop212/agent-floor
+git clone https://github.com/kasket091/agent-floor
 cd agent-floor
 npm ci
 npm run dev        # floor server on :4317 + Vite on :5173
