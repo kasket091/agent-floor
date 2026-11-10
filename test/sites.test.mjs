@@ -114,3 +114,17 @@ test('watchSites reports at start and on change only', async () => {
     stop();
   }
 });
+
+test('non-site MCP tools still match by host in their input', () => {
+  const sites = readSites(writeConfig(fixture));
+  assert.equal(siteForPayload(sites, 'mcp__claude-in-chrome__navigate', { url: 'https://penrithplastering.com.au/' }).host, 'penrithplastering.com.au');
+  assert.equal(siteForPayload(sites, 'mcp__figma__get_metadata', { nodeId: '1:2' }), null);
+});
+
+test('very deep tool input does not throw', () => {
+  const sites = readSites(writeConfig(fixture));
+  let deep = ['https://penrithplastering.com.au/'];
+  for (let i = 0; i < 5000; i++) deep = [deep];
+  assert.equal(siteForPayload(sites, 'Bash', deep), null);
+  assert.equal(siteForPayload(sites, 'Bash', [[['https://penrithplastering.com.au/']]]).host, 'penrithplastering.com.au');
+});

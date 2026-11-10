@@ -53,15 +53,16 @@ const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const hostPattern = (host) =>
   new RegExp(`(?<![a-z0-9.-])(?:www\\.)?${escape(host)}(?=[/:'"\`\\s]|$)`, 'i');
 
-function strings(value, out = []) {
+function strings(value, out = [], depth = 0) {
   if (typeof value === 'string') out.push(value);
-  else if (value && typeof value === 'object') for (const v of Object.values(value)) strings(v, out);
+  else if (value && typeof value === 'object' && depth < 50) for (const v of Object.values(value)) strings(v, out, depth + 1);
   return out;
 }
 
 export function siteForPayload(sites, toolName, toolInput) {
   const server = /^mcp__(.+?)__/.exec(toolName ?? '')?.[1];
-  if (server) return sites.find((s) => s.servers.includes(server)) ?? null;
+  const byServer = server && sites.find((s) => s.servers.includes(server));
+  if (byServer) return byServer;
   const texts = strings(toolInput);
   for (const site of sites) {
     const re = hostPattern(site.host);
