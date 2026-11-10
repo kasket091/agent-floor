@@ -1,6 +1,7 @@
 {
   "name": "agent-floor",
   "version": "0.1.0",
+  "private": true,
   "description": "A live 3D office for your coding agents. See every agent at its desk, what it is doing, and who it is talking to. Works with Claude Code, Codex, Cursor, or anything that can send an HTTP request.",
   "type": "module",
   "license": "MIT",
@@ -10,7 +11,6 @@
   "files": [
     "adapters",
     "bin",
-    "desktop",
     "dist",
     "server",
     "shared"
@@ -55,8 +55,5 @@
   "homepage": "https://github.com/develop212/agent-floor#readme",
   "bugs": {
     "url": "https://github.com/develop212/agent-floor/issues"
-  },
-  "optionalDependencies": {
-    "electron": "^44.7.0"
   }
 }

@@ -6,8 +6,9 @@
 //   agent-floor emit --agent id --status working --activity "..."  [--team x] [--to id --text "..."]
 //   agent-floor setup <claude|codex|cursor> [--write] [--project]
 //   agent-floor demo                             push a scripted demo into a running floor
+//   agent-floor quiet [hours] | stop             pause auto-open | stop the floor
 import { readFile, writeFile, mkdir, copyFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { existsSync, realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -41,12 +42,12 @@ function flags(args) {
   return out;
 }
 
-async function post(events) {
-  if (!events.length) return;
+async function post(events, path = '/events') {
+  if (!events || !Object.keys(events).length) return;
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 1200);
   try {
-    await fetch(`${URL_BASE}/events`, {
+    await fetch(`${URL_BASE}${path}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(events),
@@ -84,27 +85,27 @@ async function healthy() {
 }
 
 /**
- * Send events; if the floor is not running, open the desktop app and resend.
- * Guarded so it never spams windows: one launcher at a time (lock file), a
- * snooze after "Quit", and AGENT_FLOOR_AUTOLAUNCH=0 to turn it off.
+ * Send events (or a raw payload to `path`); if the floor is not running, open
+ * it and resend. Guarded so it never spams windows: one launcher at a time
+ * (lock file), `agent-floor quiet`, and AGENT_FLOOR_AUTOLAUNCH=0 to turn it off.
  */
-async function postOrLaunch(events) {
-  if (!events.length) return;
+async function postOrLaunch(events, path) {
+  if (!events || !Object.keys(events).length) return;
   try {
-    await post(events);
+    await post(events, path);
     return;
   } catch {
     /* not running (or slow); fall through */
   }
   if (!IS_LOCAL || process.env.AGENT_FLOOR_AUTOLAUNCH === '0') return;
-  const { isSnoozed, takeLaunchLock } = require('../desktop/state.cjs');
+  const { isSnoozed, takeLaunchLock } = require('./state.cjs');
   if (isSnoozed()) return;
-  if (takeLaunchLock()) await openApp({ fromHook: true });
+  if (takeLaunchLock()) await openApp();
   // Wait for the floor (ours or one another hook is starting), then resend.
   for (let i = 0; i < 35; i++) {
     await sleep(100);
     if (await healthy()) {
-      await post(events).catch(() => {});
+      await post(events, path).catch(() => {});
       return;
     }
   }
@@ -125,26 +126,11 @@ function findChromium() {
 }
 
 /**
- * Open the floor in its own window. Prefers the Electron desktop app; falls
- * back to a Chromium "app window" (no tabs, no address bar), then the browser.
+ * Open the floor in a Chromium "app window" (no tabs, no address bar), falling
+ * back to the default browser. Starts the server in the background first.
  */
-async function openApp({ fromHook = false, browser = false } = {}) {
+async function openApp({ browser = false } = {}) {
   const detached = { detached: true, stdio: 'ignore' };
-  let electron = null;
-  if (!browser) {
-    try {
-      electron = require('electron');
-    } catch {
-      electron = null;
-    }
-  }
-  if (typeof electron === 'string' && existsSync(electron)) {
-    const env = { ...process.env };
-    delete env.ELECTRON_RUN_AS_NODE;
-    spawn(electron, [resolve(here, '../desktop/main.cjs'), ...(fromHook ? ['--from-hook'] : [])], { ...detached, env }).unref();
-    return 'desktop';
-  }
-  // No Electron: run the server in the background, then open a window onto it.
   if (!(await healthy())) {
     spawn(process.execPath, [SELF, 'start'], detached).unref();
     for (let i = 0; i < 30 && !(await healthy()); i++) await sleep(100);
@@ -165,23 +151,30 @@ async function app(args) {
   const f = flags(args);
   const how = await openApp({ browser: Boolean(f.browser) });
   console.log(
-    how === 'desktop'
-      ? 'Agent Floor is opening in its own window. It keeps running in the menu bar when you close it.'
-      : how === 'app-window'
-        ? 'Agent Floor is opening in an app window. Install Electron (npm i -g electron) for the full desktop app.'
-        : `Agent Floor is running at http://127.0.0.1:${PORT}`,
+    how === 'app-window'
+      ? 'Agent Floor is opening in an app window. Closing it leaves the floor running; `agent-floor stop` stops it.'
+      : `Agent Floor is running at http://127.0.0.1:${PORT}`,
   );
 }
 
 // ---------------------------------------------------------------- hook
 // A hook must never slow down or break the agent. Every failure is swallowed
 // and the process always exits 0.
+
+/** Long strings (a Write's content) only cost bytes: the floor shows a line of them. */
+function clip(v) {
+  if (typeof v === 'string') return v.length > 2000 ? v.slice(0, 2000) : v;
+  if (Array.isArray(v)) return v.map(clip);
+  if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, clip(x)]));
+  return v;
+}
+
 async function hook(kind) {
   let response = '';
   try {
     if (kind === 'claude') {
-      const { fromClaude } = await import('../adapters/claude.mjs');
-      await postOrLaunch(fromClaude(parseJson(await readStdin())));
+      // Fallback for claudeHookCommand's curl: the server translates the raw payload.
+      await postOrLaunch(clip(parseJson(await readStdin())), '/hooks/claude');
     } else if (kind === 'codex') {
       const { fromCodex } = await import('../adapters/codex.mjs');
       // notify passes JSON as the last argv entry; hooks pass it on stdin.
@@ -232,13 +225,22 @@ async function emit(args) {
 }
 
 // ---------------------------------------------------------------- setup
-// When run through `npx`, this file lives in a throwaway cache, so point hooks
-// at the package name instead of the file path.
+// Hooks always run this checkout by absolute path. An npx cache is thrown away, so setup refuses it.
 const viaNpx = /[\\/]_npx[\\/]/.test(SELF);
-const hookCmd = (kind) => (viaNpx ? `npx -y agent-floor hook ${kind}` : `node "${SELF}" hook ${kind}`);
+const hookCmd = (kind) => `node "${SELF}" hook ${kind}`;
 
-function claudeHooks() {
-  const command = hookCmd('claude');
+/**
+ * The Claude Code hook: curl the raw payload to the floor (a few ms). Only if
+ * that fails, hand it to the Node fallback in the background, which can launch
+ * the floor. Prints nothing and always exits 0, so Claude never waits on it.
+ * shortcut: `self` goes inside double quotes unescaped, so a checkout path with `"`, `$` or a backtick breaks it; escape it if that ever happens.
+ */
+export function claudeHookCommand(port, self) {
+  return `p=$(cat); printf '%s' "$p" | curl -sf -m 1 -H 'Content-Type: application/json' --data-binary @- http://127.0.0.1:${port}/hooks/claude >/dev/null 2>&1 || { printf '%s' "$p" | nohup node "${self}" hook claude >/dev/null 2>&1 & }; exit 0`;
+}
+
+export function claudeHooks() {
+  const command = claudeHookCommand(PORT, SELF);
   const events = ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Notification', 'Stop', 'SubagentStop', 'PreCompact', 'SessionEnd'];
   const hooks = {};
   for (const e of events) {
@@ -264,7 +266,13 @@ async function readJsonFile(path) {
 
 async function backupAndWrite(path, data) {
   await mkdir(dirname(path), { recursive: true });
-  if (existsSync(path)) await copyFile(path, `${path}.bak`);
+  if (existsSync(path)) {
+    const dated = `${path}.before-agent-floor-${new Date().toLocaleDateString('en-CA')}`; // YYYY-MM-DD, local
+    let backup = dated;
+    for (let n = 2; existsSync(backup); n++) backup = `${dated}-${n}`;
+    await copyFile(path, backup);
+    await copyFile(path, `${path}.bak`);
+  }
   await writeFile(path, JSON.stringify(data, null, 2) + '\n');
 }
 
@@ -275,6 +283,10 @@ function isOurs(entry) {
 async function setup(args) {
   const f = flags(args);
   const kind = f._[0];
+  if (viaNpx) {
+    console.error('Agent Floor cannot be set up from npx: its cache is temporary. Clone the repo and run node bin/agent-floor.mjs setup from there.');
+    process.exit(1);
+  }
   if (kind === 'claude') {
     const hooks = claudeHooks();
     const path = f.project ? resolve('.claude/settings.json') : join(homedir(), '.claude', 'settings.json');
@@ -290,7 +302,7 @@ async function setup(args) {
       settings.hooks[event] = [...kept, ...entries];
     }
     await backupAndWrite(path, settings);
-    console.log(`Merged Agent Floor hooks into ${path} (backup at ${path}.bak). Agent Floor will open by itself the next time a Claude Code session starts.`);
+    console.log(`Merged Agent Floor hooks into ${path} (backup next to it as .before-agent-floor-<date> and .bak). Agent Floor will open by itself the next time a Claude Code session starts.`);
   } else if (kind === 'cursor') {
     const config = cursorHooks();
     const path = f.project ? resolve('.cursor/hooks.json') : join(homedir(), '.cursor', 'hooks.json');
@@ -307,11 +319,11 @@ async function setup(args) {
       current.hooks[event] = [...kept, ...entries];
     }
     await backupAndWrite(path, current);
-    console.log(`Merged Agent Floor hooks into ${path} (backup at ${path}.bak). Agent Floor will open by itself the next time a Cursor agent runs.`);
+    console.log(`Merged Agent Floor hooks into ${path} (backup next to it as .before-agent-floor-<date> and .bak). Agent Floor will open by itself the next time a Cursor agent runs.`);
   } else if (kind === 'codex') {
     const path = join(homedir(), '.codex', 'config.toml');
     console.log(`Add this line near the top of ${path}:\n`);
-    console.log(viaNpx ? 'notify = ["npx", "-y", "agent-floor", "hook", "codex"]\n' : `notify = ["node", "${SELF}", "hook", "codex"]\n`);
+    console.log(`notify = ["node", "${SELF}", "hook", "codex"]\n`);
     console.log('Codex allows one notify program. If you already have one, chain them in a small script.');
   } else {
     console.log('Usage: agent-floor setup <claude|codex|cursor> [--write] [--project]');
@@ -326,7 +338,15 @@ async function start(args) {
   const port = Number(f.port) || undefined;
   const host = f.host || undefined;
   try {
-    await startServer({ port, host });
+    const floor = await startServer({
+      port,
+      host,
+      // POST /shutdown (agent-floor stop). The timer covers a connection that will not close.
+      onShutdown: () => {
+        setTimeout(() => process.exit(0), 1000).unref();
+        floor.close().finally(() => process.exit(0));
+      },
+    });
     if (f.open) await openApp({ browser: Boolean(f.browser) });
     console.log('Connect an agent:  agent-floor setup claude | codex | cursor');
     console.log('Press Ctrl+C to stop.');
@@ -334,6 +354,23 @@ async function start(args) {
     console.error(err.code === 'EADDRINUSE' ? `Port ${port || 4317} is already in use. Try --port 4318.` : err.message);
     process.exit(1);
   }
+}
+
+// ---------------------------------------------------------------- quiet / stop
+async function quiet(args) {
+  const hours = Number(flags(args)._[0]) || 6;
+  require('./state.cjs').snooze(hours);
+  console.log(`Hooks will not open Agent Floor for ${hours} hour${hours === 1 ? '' : 's'}. Run agent-floor to open it yourself.`);
+}
+
+async function stop() {
+  const res = await fetch(`${URL_BASE}/shutdown`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{}',
+    signal: AbortSignal.timeout(2000),
+  }).catch(() => null);
+  console.log(res?.ok ? `Stopped the floor at ${URL_BASE}.` : `No floor was running at ${URL_BASE}.`);
 }
 
 // ---------------------------------------------------------------- demo
@@ -359,12 +396,24 @@ async function demo(args) {
   }
 }
 
-const commands = { app, start, hook: () => hook(rest[0]), emit, setup, demo };
-if (cmd === '--help' || cmd === '-h' || cmd === 'help') {
+const commands = { app, start, hook: () => hook(rest[0]), emit, setup, demo, quiet, stop };
+// Run only as the CLI, so tests can import the exports. realpath: npm links bin files.
+const isMain = (() => {
+  try {
+    return realpathSync(process.argv[1]) === SELF;
+  } catch {
+    return false;
+  }
+})();
+if (!isMain) {
+  // Imported by a test: export only.
+} else if (cmd === '--help' || cmd === '-h' || cmd === 'help') {
   console.log(`agent-floor: a live 3D office for your coding agents
 
-  agent-floor                              open the desktop app (starts the floor too)
+  agent-floor                              open the floor in an app window (starts it too)
   agent-floor start [--port 4317] [--open] run the floor without a window
+  agent-floor stop                         stop the floor
+  agent-floor quiet [hours]                hooks don't open the floor for a while (default 6)
   agent-floor setup <claude|codex|cursor> [--write] [--project]
   agent-floor emit --agent <id> --status working --activity "Writing tests" [--team checkout]
   agent-floor demo [--agents 60]          (stress test with many agents)

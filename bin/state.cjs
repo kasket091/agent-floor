@@ -1,4 +1,4 @@
-// Small bits of state shared by the desktop app and the hooks, kept in ~/.agent-floor.
+// Auto-open state shared by the CLI and the hooks (snooze and launch lock), kept in ~/.agent-floor.
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
