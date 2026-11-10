@@ -145,10 +145,10 @@ export class SeatBook {
   }
 }
 
-function officeWidth(podSlots: number, hasLead: boolean) {
+function officeWidth(podSlots: number, hasLead: boolean, reserveLead = hasLead) {
   const cols = Math.max(1, Math.ceil(podSlots / 2));
   const need = LEFT_ROOM + (hasLead ? LEAD_SPACE : 0) + cols * DESK_PITCH + RIGHT_ROOM;
-  const w = Math.max(9, need);
+  const w = Math.max(9, need + (reserveLead && !hasLead ? LEAD_SPACE : 0));
   return { w, cols, extra: w - need };
 }
 
@@ -179,7 +179,8 @@ export function computeLayout(state: WorldState, book: SeatBook): BuildingLayout
     const maxSlot = slots.size ? Math.max(...slots.values()) + 1 : 0;
     // Offices grow four seats at a time, so the building is reshaped rarely.
     const podSlots = Math.max(4, Math.ceil(maxSlot / 4) * 4);
-    const { w, cols, extra } = officeWidth(podSlots, Boolean(leadId));
+    // Pinned rooms always leave space for a lead desk, so a lead arriving doesn't move the rooms next door.
+    const { w, cols, extra } = officeWidth(podSlots, Boolean(leadId), Boolean(leadId || team.pinned));
     const d = OFFICE_D;
     let side = book.wings.get(team.id);
     if (!side) {
