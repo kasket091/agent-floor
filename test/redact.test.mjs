@@ -69,8 +69,39 @@ test('no false positives', () => {
     'python3 tools/site.py push',
     'Reading SKILL.md',
     'git commit -m "fix key handling"',
-    'will need more time with this',
   ]) assert.equal(redact(s), s);
+});
+
+test('six 4-letter words count as an app password (hiding too much is the safer side)', () => {
+  assert.equal(redact('will need more time with this'), MASK);
+});
+
+test('letters-only WordPress application password', () => {
+  hides('abcd EFGH ijkl MNOP qrst UVWX', 'abcd EFGH');
+});
+
+test('Authorization in JSON and JS object form', () => {
+  const tok = 'x'.repeat(40);
+  for (const s of [
+    `{"Authorization": "Bearer ${tok}"}`,
+    `{headers: {Authorization: 'Bearer ${tok}'}}`,
+    `{"Authorization": "Basic dXNlcjpwYXNz"}`,
+  ]) {
+    const out = hides(s, s.includes('Basic') ? 'dXNlcjpwYXNz' : tok);
+    assert.ok(!out.includes('Bearer') && !out.includes('Basic'), out);
+  }
+});
+
+test('quoted values with spaces are masked to the closing quote', () => {
+  assert.equal(redact('password: "hunter two" next'), `password: "${MASK}" next`);
+  assert.equal(redact('export TOKEN="abc def ghi" && go'), `export TOKEN="${MASK}" && go`);
+  assert.equal(redact("secret='a b c'"), `secret='${MASK}'`);
+});
+
+test('no quadratic backtracking on long dash runs', () => {
+  const t = performance.now();
+  redact('a-'.repeat(25000));
+  assert.ok(performance.now() - t < 100, `took ${performance.now() - t} ms`);
 });
 
 test('non-strings are returned unchanged', () => {
