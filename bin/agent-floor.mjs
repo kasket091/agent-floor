@@ -432,7 +432,7 @@ if (!isMain) {
   agent-floor demo [--agents 60]          (stress test with many agents)
   agent-floor hook <claude|codex|cursor>    (called by agent hooks)
 
-Environment: AGENT_FLOOR_URL, AGENT_FLOOR_PORT, AGENT_FLOOR_TEAM, AGENT_FLOOR_NAME,\n             AGENT_FLOOR_AUTOLAUNCH=0 (hooks never open the app)`);
+Environment: AGENT_FLOOR_URL, AGENT_FLOOR_PORT, AGENT_FLOOR_AUTOLAUNCH=0 (hooks never open the app),\n             AGENT_FLOOR_TEAM, AGENT_FLOOR_NAME (room and lead name; for Claude Code they apply\n             floor-wide and are read from the environment the floor starts in)`);
 } else if (commands[cmd]) {
   await commands[cmd](rest);
 } else if (cmd.startsWith('--')) {

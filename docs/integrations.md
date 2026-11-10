@@ -4,7 +4,7 @@ Every integration does the same thing: turn "something happened in my agent" int
 
 ## Claude Code
 
-`agent-floor setup claude --write` merges this into `~/.claude/settings.json` (a `.bak` copy of the old file is kept):
+`agent-floor setup claude --write` merges this into `~/.claude/settings.json` (the old file is kept next to it as `settings.json.before-agent-floor-<YYYY-MM-DD>`, never overwritten, plus a `.bak` copy of the latest):
 
 ```json
 {

@@ -109,8 +109,8 @@ The full event format is in [docs/protocol.md](docs/protocol.md). More integrati
 | `AGENT_FLOOR_PORT` | `4317` | server, hooks |
 | `AGENT_FLOOR_HOST` | `127.0.0.1` | server |
 | `AGENT_FLOOR_URL` | `http://127.0.0.1:4317` | hooks, `emit`, `demo` |
-| `AGENT_FLOOR_TEAM` | Claude Code: the Lobby (site rooms still apply). Codex, Cursor: project folder name | hooks: put this session in a named room |
-| `AGENT_FLOOR_NAME` | `Claude`, `Codex`, `Cursor` | hooks: the lead's display name |
+| `AGENT_FLOOR_TEAM` | Claude Code: the Lobby (site rooms still apply). Codex, Cursor: project folder name | Claude Code: floor-wide, every session goes to this room. Set it in the environment the floor starts in (the first hook that launches the floor passes its own). Codex, Cursor: per session, from the hook's environment |
+| `AGENT_FLOOR_NAME` | `Claude`, `Codex`, `Cursor` | the lead's display name. Claude Code: floor-wide, set in the environment when the floor starts. Codex, Cursor: per session |
 | `AGENT_FLOOR_AUTOLAUNCH` | `1` | set to `0` so hooks never open the app |
 | `AGENT_FLOOR_CLAUDE_CONFIG` | `~/.claude.json` | server: where to read WordPress MCP connections for site rooms |
 

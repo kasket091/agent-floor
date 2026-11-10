@@ -50,10 +50,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/develop212/agent-floor.git"
+    "url": "git+https://github.com/kasket091/agent-floor.git"
   },
-  "homepage": "https://github.com/develop212/agent-floor#readme",
+  "homepage": "https://github.com/kasket091/agent-floor#readme",
   "bugs": {
-    "url": "https://github.com/develop212/agent-floor/issues"
+    "url": "https://github.com/kasket091/agent-floor/issues"
   }
 }
