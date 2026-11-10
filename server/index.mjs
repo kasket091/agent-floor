@@ -13,17 +13,12 @@ import { extname, join, normalize, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { applyEvent, createState, normalizeEvent, sweep, PROTOCOL_VERSION } from '../shared/protocol.js';
 import { createClaudeIngest } from './claude-ingest.mjs';
-import { redact } from './redact.mjs';
+import { redactDeep } from './redact.mjs';
 import { DEFAULT_CONFIG, watchSites } from './sites.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const MAX_BODY = 256 * 1024;
 const MAX_HOOK_BODY = 4 * 1024 * 1024;
-
-const redactFields = (raw) =>
-  raw && typeof raw === 'object'
-    ? { ...raw, activity: redact(raw.activity), text: redact(raw.text), task: redact(raw.task), name: redact(raw.name) }
-    : raw;
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -161,7 +156,8 @@ export function startServer({
         const body = await readBody(req);
         const list = Array.isArray(body) ? body : [body];
         let accepted = 0;
-        for (const raw of list.slice(0, 200)) if (ingest(redactFields(raw))) accepted++;
+        // Every displayed field, from any source. Absurd nesting throws a RangeError here and ends as a 400.
+        for (const raw of list.slice(0, 200)) if (ingest(redactDeep(raw))) accepted++;
         return json(res, accepted ? 202 : 400, { accepted, rejected: list.length - accepted });
       }
       if (pathname === '/hooks/claude' && req.method === 'POST') {

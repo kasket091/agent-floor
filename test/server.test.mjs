@@ -69,7 +69,7 @@ async function until(check, ms = 3000) {
 }
 
 test('site rooms, Claude hooks, body limit and redaction', async () => {
-  const { floor, post, getState, claudeConfig } = await siteFloor();
+  const { floor, base, post, getState, claudeConfig } = await siteFloor();
   try {
     let state = await getState();
     assert.equal(state.teams[ROOM]?.pinned, true);
@@ -102,6 +102,20 @@ test('site rooms, Claude hooks, body limit and redaction', async () => {
     await post('/events', { type: 'status', agent: 'a', activity: 'password=x', text: 'token=y', task: 'secret=z', name: 'pwd=w' });
     const text = JSON.stringify(await getState());
     for (const s of ['password=x', 'token=y', 'secret=z', 'pwd=w']) assert.ok(!text.includes(s), s);
+
+    await post('/events', [
+      { type: 'join', agent: { id: 'b', name: 'password=X1', role: 'token=X2' }, team: 'secret=X3' },
+      { type: 'message', agent: 'b', to: 'token=X4', text: 'hi' },
+      { type: 'tool', agent: 'b', tool: 'Authorization: Bearer X5' },
+    ]);
+    const all = JSON.stringify(await getState());
+    for (const s of ['X1', 'X2', 'X3', 'X4', 'X5']) assert.ok(!all.includes(s), s);
+
+    // Under the 256 KB limit but deep enough to overflow the stack while redacting.
+    const n = 40000;
+    const deep = '{"type":"status","agent":"c","x":' + '{"x":'.repeat(n) + '{}' + '}'.repeat(n + 1);
+    assert.equal((await post('/events', deep)).status, 400);
+    assert.equal((await fetch(`${base}/health`)).status, 200);
 
     fs.writeFileSync(claudeConfig, JSON.stringify({ mcpServers: {} }));
     await until(async () => (await getState()).teams[ROOM]?.pinned === false);

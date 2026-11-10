@@ -42,7 +42,14 @@ test('a site MCP tool moves the session; later tools stay in that room', () => {
 });
 
 test('a helper touching a site moves the whole session', () => {
-  const agents = { [LEAD]: {}, [`${LEAD}:abc`]: {}, 'claude-code:s2': {}, 'claude-code:s1x': {} };
+  const agents = {
+    [LEAD]: { status: 'working' },
+    [`${LEAD}:abc`]: { status: 'thinking' },
+    [`${LEAD}:old`]: { status: 'done' },
+    [`${LEAD}:gone`]: { status: 'offline' },
+    'claude-code:s2': {},
+    'claude-code:s1x': {},
+  };
   const events = setup(agents)(
     p('PreToolUse', {
       agent_id: 'h1',
@@ -100,4 +107,15 @@ test('bad payloads never throw', () => {
   }
   const broken = createClaudeIngest({ getSites: () => { throw new Error('boom'); }, getState: () => ({ agents: {} }) });
   assert.deepEqual(broken(p('SessionStart')), []);
+});
+
+test('a plan set in the Lobby follows the session to the site room', () => {
+  const ingest = setup();
+  ingest(p('PreToolUse', { tool_name: 'mcp__ccd_turn__update_plan', tool_input: { items: [
+    { content: 'Plan', status: 'completed' },
+    { content: 'Build hero', status: 'in_progress' },
+  ] } }));
+  const events = ingest(p('PreToolUse', { tool_name: 'mcp__penrith-plastering-and-gyprock-elementor__x', tool_input: {} }));
+  const tasks = events.filter((e) => e.type === 'task').map((e) => normalizeEvent(e));
+  assert.deepEqual(tasks.map((e) => [e.team, e.task]), [[PENRITH, '2/2 · Build hero']]);
 });

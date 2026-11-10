@@ -24,9 +24,12 @@ export function createClaudeIngest({ getSites, getState }) {
     const site = siteForPayload(getSites() ?? [], p.tool_name, p.tool_input);
     if (site && site.host !== session.room.id) {
       session.room = { id: site.host, name: site.name };
-      for (const id of Object.keys(getState().agents)) {
+      for (const [id, agent] of Object.entries(getState().agents)) {
+        if (agent?.status === 'done' || agent?.status === 'offline') continue; // let finished helpers go
         if (id === lead || id.startsWith(lead + ':')) out.push({ type: 'status', agent: id });
       }
+      const task = planText(session.plan); // the whiteboard moves with the session
+      if (task) out.push({ type: 'task', agent: lead, task });
     }
 
     // PreToolUse only: the PostToolUse of the same call would advance the plan twice.
