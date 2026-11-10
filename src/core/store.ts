@@ -79,7 +79,7 @@ class Store {
       }
     }
     const used = new Set(Object.values(this.state.agents).map((a) => a.team));
-    for (const id of Object.keys(this.state.teams)) if (!used.has(id)) delete this.state.teams[id];
+    for (const id of Object.keys(this.state.teams)) if (!used.has(id) && !this.state.teams[id].pinned) delete this.state.teams[id];
     if (this.selected && !this.state.agents[this.selected]) this.selected = null;
     if (changed) this.emit();
   }

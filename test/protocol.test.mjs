@@ -116,3 +116,14 @@ test('an unpinned empty team is still removed by sweep', () => {
 test('rooms normalises bad input to an empty list', () => {
   assert.deepEqual(normalizeEvent({ type: 'rooms', rooms: 'x' }), { type: 'rooms', rooms: [] });
 });
+
+test('browser store keeps pinned rooms when agents are removed', async () => {
+  const { store } = await import('../src/core/store.ts');
+  store.state = createState();
+  // Node 22 strips the TypeScript types, so the real browser Store runs here.
+  run(store.state, { type: 'rooms', rooms: [{ id: 'site.com', name: 'Site' }] });
+  run(store.state, { type: 'join', agent: 'a', team: 'Other' });
+  store.remove(['a']);
+  assert.ok(store.state.teams['site-com']);
+  assert.equal(store.state.teams.other, undefined);
+});
