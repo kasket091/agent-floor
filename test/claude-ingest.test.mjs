@@ -119,3 +119,15 @@ test('a plan set in the Lobby follows the session to the site room', () => {
   const tasks = events.filter((e) => e.type === 'task').map((e) => normalizeEvent(e));
   assert.deepEqual(tasks.map((e) => [e.team, e.task]), [[PENRITH, '2/2 · Build hero']]);
 });
+
+test('a quoted curl -u application password never reaches the activity text', () => {
+  const app = 'abcd efgh ijkl mnop qrst uvwx';
+  for (const command of [
+    `curl -u "admin:${app}" https://example.test/wp-json`,
+    `curl --user 'admin:${app}' https://example.test/wp-json`,
+    `curl -u admin:"${app}" https://example.test/wp-json`,
+  ]) {
+    const text = JSON.stringify(setup()(p('PreToolUse', { tool_name: 'Bash', tool_input: { command } })));
+    for (const g of app.split(' ')) assert.ok(!text.includes(g), `leaked ${g}: ${text}`);
+  }
+});

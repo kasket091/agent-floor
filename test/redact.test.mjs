@@ -129,3 +129,36 @@ test('redactDeep clips after redacting', () => {
   assert.ok(out.length <= 2000);
   assert.ok(!out.includes('ghp_') && !out.includes('a'));
 });
+
+test('curl -u with a quoted WordPress application password hides every group', () => {
+  const app = 'abcd efgh ijkl mnop qrst uvwx';
+  for (const s of [
+    `curl -u "admin:${app}" https://x.com`,
+    `curl --user 'admin:${app}' https://x.com`,
+    `curl -u admin:"${app}" https://x.com`,
+    `curl --user="admin:${app}" https://x.com`,
+  ]) {
+    const out = redact(s);
+    for (const g of app.split(' ')) assert.ok(!out.includes(g), `still shows ${g}: ${out}`);
+    assert.ok(out.includes('https://x.com'), out);
+  }
+});
+
+test('curl -u quoted and glued forms', () => {
+  assert.equal(redact('curl -u "admin:s3cret pass" https://x.com'), `curl -u "admin:${MASK}" https://x.com`);
+  assert.equal(redact("curl --user 'admin:s3cret' https://x.com"), `curl --user 'admin:${MASK}' https://x.com`);
+  hides('curl -uadmin:s3cret https://x.com', 's3cret');
+});
+
+test('pass keys: user_pass, dbpass, WP_PASS', () => {
+  hides('wp user update 1 --user_pass=hunter2secret', 'hunter2secret');
+  hides('wp config create --dbname=wp --dbuser=root --dbpass=hunter2secret', 'hunter2secret');
+  hides('WP_PASS=hunter2secret wp core install', 'hunter2secret');
+  hides('passwd: hunter2secret', 'hunter2secret');
+});
+
+test('pass key: no false positives on ordinary words', () => {
+  for (const s of ['npm run build', 'all tests pass', 'passing the ball', 'bypass the cache', 'compass rose']) {
+    assert.equal(redact(s), s);
+  }
+});

@@ -1,7 +1,7 @@
 // Hides secrets in text before it is shown in the UI. Order matters: headers first.
 export const MASK = '•••';
 
-const KEYS = 'password|passwd|pwd|token|secret|api[_-]?key|apikey|key|auth';
+const KEYS = 'pass|pwd|token|secret|api[_-]?key|apikey|key|auth';
 
 const RULES = [
   // Authorization-style headers: mask to the closing quote or end of line.
@@ -10,8 +10,14 @@ const RULES = [
   // URL userinfo: scheme://user:pass@host
   // Scheme starts only at a token start and is bounded, so long runs cannot backtrack quadratically.
   [/((?<![a-z0-9+.-])[a-z][a-z0-9+.-]{0,30}:\/\/[^\s:/@]+):[^\s@/]+@/gi, `$1:${MASK}@`],
-  // curl -u user:pass / --user user:pass
-  [/((?:^|\s)(?:-u|--user)[\s=]+[^\s:]+):\S+/g, `$1:${MASK}`],
+  // Before curl -u, so a quoted app password is hidden whole. WordPress application password: six groups of four. Also hits six 4-letter words; hiding too much is the safer side.
+  [/\b[A-Za-z0-9]{4}(?: [A-Za-z0-9]{4}){5}\b/g, MASK],
+  // curl -u user:pass, --user user:pass, -uuser:pass, -u "user:pass", -u user:"pass": quoted values mask to the closing quote.
+  [
+    /((?:^|\s)(?:-u\s*|--user[\s=]+))(?:"([^"\s:]+):[^"\r\n]*"?|'([^'\s:]+):[^'\r\n]*'?|([^\s:"']+):("[^"\r\n]*"?|'[^'\r\n]*'?|\S+))/g,
+    (_, pre, dq, sq, user, v) =>
+      dq ? `${pre}"${dq}:${MASK}"` : sq ? `${pre}'${sq}:${MASK}'` : `${pre}${user}:${v[0] === '"' || v[0] === "'" ? v[0] + MASK + v[0] : MASK}`,
+  ],
   // key/value and env assignments: password=x, "token": "x", WP_APP_PASSWORD=x
   // Quoted values are masked to the closing quote (or end of line).
   // Names start only at a token start and are bounded, so long dash/word runs cannot backtrack quadratically.
@@ -26,8 +32,6 @@ const RULES = [
   [/\bxox[abprs]-[A-Za-z0-9-]{10,}/g, MASK],
   [/\bAKIA[0-9A-Z]{16}\b/g, MASK],
   [/\beyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, MASK],
-  // WordPress application password: six groups of four. Also hits six 4-letter words; hiding too much is the safer side.
-  [/\b[A-Za-z0-9]{4}(?: [A-Za-z0-9]{4}){5}\b/g, MASK],
 ];
 
 export function redact(text) {
