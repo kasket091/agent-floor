@@ -16,11 +16,24 @@ const noConfig = join(tmp, 'no-claude.json');
 // Never touch the real ~/.claude, ~/.agent-floor or a live floor, and never open a window.
 const env = { ...process.env, HOME: tmp, AGENT_FLOOR_HOME: join(tmp, 'state'), AGENT_FLOOR_AUTOLAUNCH: '0', AGENT_FLOOR_CLAUDE_CONFIG: noConfig };
 delete env.AGENT_FLOOR_URL;
-const FALLBACK = `${SELF} hook claude`;
+// Processes the tests start run the CLI through this link, so the temp dir is in their argv and
+// cleanup/pgrep match only them, never a live floor or its fallbacks run from this checkout.
+// Node runs a symlinked main module from its real path, so imports and the isMain check still work.
+const MARKED = join(tmp, 'bin', 'agent-floor.mjs');
+fs.mkdirSync(dirname(MARKED));
+fs.symlinkSync(SELF, MARKED);
+const FALLBACK = `${MARKED} hook claude`;
+
+// The floor `agent-floor app` launches runs from the real path; that test stops it by port in its finally.
+const cleanup = () => spawnSync('pkill', ['-f', MARKED]);
+// Stand-ins for a live floor and its fallbacks run from this same checkout: the tests must never touch them.
+const decoys = [`${SELF} start`, `${SELF} hook claude`].map((tag) =>
+  spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)', tag], { stdio: 'ignore' }),
+);
 
 after(() => {
-  spawnSync('pkill', ['-f', FALLBACK]);
-  spawnSync('pkill', ['-f', `${SELF} start`]);
+  cleanup();
+  for (const d of decoys) d.kill();
   fs.rmSync(tmp, { recursive: true, force: true });
 });
 
@@ -37,7 +50,7 @@ const freePort = () =>
 function runHook(port, payload, extraEnv = {}) {
   return new Promise((done) => {
     const t0 = performance.now();
-    const child = spawn('/bin/sh', ['-c', claudeHookCommand(port, SELF)], { env: { ...env, AGENT_FLOOR_PORT: String(port), ...extraEnv } });
+    const child = spawn('/bin/sh', ['-c', claudeHookCommand(port, MARKED)], { env: { ...env, AGENT_FLOOR_PORT: String(port), ...extraEnv } });
     let stdout = '';
     child.stdout.setEncoding('utf8').on('data', (d) => (stdout += d));
     child.on('close', (status) => done({ status, stdout, ms: performance.now() - t0 }));
@@ -131,7 +144,7 @@ test('quiet snoozes auto-open (default 6 hours)', () => {
 test('stop shuts a running floor down and says whether one was running', async () => {
   const port = await freePort();
   const portEnv = { AGENT_FLOOR_PORT: String(port) };
-  const child = spawn(process.execPath, [SELF, 'start', '--port', String(port)], { env: { ...env, ...portEnv }, stdio: 'ignore' });
+  const child = spawn(process.execPath, [MARKED, 'start', '--port', String(port)], { env: { ...env, ...portEnv }, stdio: 'ignore' });
   const exited = new Promise((r) => child.once('exit', r));
   try {
     let up = false;
@@ -222,7 +235,7 @@ test('after stop, hooks do not relaunch the floor; agent-floor clears that and o
     PATH: `${fakeBin}:${process.env.PATH}`,
   };
   const health = () => fetch(`http://127.0.0.1:${port}/health`).then((res) => res.ok, () => false);
-  const child = spawn(process.execPath, [SELF, 'start', '--port', String(port)], { env: { ...env, ...e }, stdio: 'ignore' });
+  const child = spawn(process.execPath, [MARKED, 'start', '--port', String(port)], { env: { ...env, ...e }, stdio: 'ignore' });
   const exited = new Promise((r) => child.once('exit', r));
   try {
     let up = false;
@@ -254,4 +267,10 @@ test('after stop, hooks do not relaunch the floor; agent-floor clears that and o
     child.kill();
     cli(['stop'], e);
   }
+});
+
+test('cleanup kills only what these tests started, never a live floor from this checkout', async () => {
+  cleanup();
+  await sleep(300); // let a killed decoy be reaped, so its exit shows
+  for (const d of decoys) assert.ok(d.exitCode === null && d.signalCode === null, `cleanup killed ${d.spawnargs.at(-1)}`);
 });
