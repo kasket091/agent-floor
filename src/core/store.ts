@@ -71,6 +71,7 @@ class Store {
   }
 
   remove(ids: string[]) {
+    const teams = Object.keys(this.state.teams).length;
     let changed = false;
     for (const id of ids) {
       if (this.state.agents[id]) {
@@ -81,12 +82,14 @@ class Store {
     const used = new Set(Object.values(this.state.agents).map((a) => a.team));
     for (const id of Object.keys(this.state.teams)) if (!used.has(id) && !this.state.teams[id].pinned) delete this.state.teams[id];
     if (this.selected && !this.state.agents[this.selected]) this.selected = null;
-    if (changed) this.emit();
+    // An empty room that lost its pin goes without any agent leaving.
+    if (changed || Object.keys(this.state.teams).length !== teams) this.emit();
   }
 
   sweepLocal() {
+    const teams = Object.keys(this.state.teams).length;
     const removed = sweep(this.state);
-    if (removed.length) {
+    if (removed.length || Object.keys(this.state.teams).length !== teams) {
       if (this.selected && removed.includes(this.selected)) this.selected = null;
       this.emit();
     }

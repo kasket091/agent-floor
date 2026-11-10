@@ -4,15 +4,26 @@
 //   GET  /stream        Server-Sent Events: a `snapshot`, then `event` + `effects`
 //   GET  /state         current world as JSON
 //   POST /reset         clear the floor
+//   POST /hooks/claude  a raw Claude Code hook payload (translated here, see claude-ingest.mjs)
+//   POST /shutdown      stop the floor (the CLI passes onShutdown)
 //   GET  /*             the built web app (dist/)
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { applyEvent, createState, normalizeEvent, sweep, PROTOCOL_VERSION } from '../shared/protocol.js';
+import { createClaudeIngest } from './claude-ingest.mjs';
+import { redact } from './redact.mjs';
+import { DEFAULT_CONFIG, watchSites } from './sites.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const MAX_BODY = 256 * 1024;
+const MAX_HOOK_BODY = 4 * 1024 * 1024;
+
+const redactFields = (raw) =>
+  raw && typeof raw === 'object'
+    ? { ...raw, activity: redact(raw.activity), text: redact(raw.text), task: redact(raw.task), name: redact(raw.name) }
+    : raw;
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -30,9 +41,14 @@ export function startServer({
   host = process.env.AGENT_FLOOR_HOST || '127.0.0.1',
   staticDir = resolve(here, '../dist'),
   log = console.log,
+  claudeConfig = process.env.AGENT_FLOOR_CLAUDE_CONFIG || DEFAULT_CONFIG,
+  sitesPollMs = 30000,
+  onShutdown,
 } = {}) {
   const state = createState();
   const clients = new Set();
+  let sites = [];
+  let rooms; // the last `rooms` event, re-applied after every reset
 
   function broadcast(name, data) {
     const frame = `event: ${name}\ndata: ${JSON.stringify(data)}\n\n`;
@@ -44,25 +60,44 @@ export function startServer({
     if (!ev) return false;
     const { effects } = applyEvent(state, ev);
     broadcast('event', { event: ev, effects });
+    if (ev.type === 'reset' && rooms) ingest(rooms);
     return true;
   }
 
+  const ingestClaude = createClaudeIngest({ getSites: () => sites, getState: () => state });
+  const stopSites = watchSites(
+    claudeConfig,
+    (list) => {
+      try {
+        sites = list;
+        rooms = { type: 'rooms', rooms: list.map((s) => ({ id: s.host, name: s.name })) };
+        ingest(rooms);
+      } catch (err) {
+        log(`Could not update site rooms: ${err.message}`);
+      }
+    },
+    sitesPollMs,
+  );
+
   const sweeper = setInterval(() => {
+    const teams = Object.keys(state.teams).length;
     const removed = sweep(state);
-    if (removed.length) broadcast('removed', { agents: removed });
+    // Also when only a team went (an unpinned empty room), so browsers prune it too.
+    if (removed.length || Object.keys(state.teams).length !== teams) broadcast('removed', { agents: removed });
   }, 2000);
   const heartbeat = setInterval(() => {
     for (const res of clients) res.write(': ping\n\n');
   }, 20000);
 
-  async function readBody(req) {
+  async function readBody(req, limit = MAX_BODY) {
     let size = 0;
     const chunks = [];
     for await (const chunk of req) {
       size += chunk.length;
-      if (size > MAX_BODY) throw Object.assign(new Error('Body too large'), { status: 413 });
-      chunks.push(chunk);
+      // Keep reading past the limit and drop it, so the client sees the 413 instead of a reset socket.
+      if (size <= limit) chunks.push(chunk);
     }
+    if (size > limit) throw Object.assign(new Error('Body too large'), { status: 413 });
     const text = Buffer.concat(chunks).toString('utf8');
     return text ? JSON.parse(text) : null;
   }
@@ -126,8 +161,19 @@ export function startServer({
         const body = await readBody(req);
         const list = Array.isArray(body) ? body : [body];
         let accepted = 0;
-        for (const raw of list.slice(0, 200)) if (ingest(raw)) accepted++;
+        for (const raw of list.slice(0, 200)) if (ingest(redactFields(raw))) accepted++;
         return json(res, accepted ? 202 : 400, { accepted, rejected: list.length - accepted });
+      }
+      if (pathname === '/hooks/claude' && req.method === 'POST') {
+        const body = await readBody(req, MAX_HOOK_BODY);
+        let accepted = 0;
+        for (const ev of ingestClaude(body)) if (ingest(ev)) accepted++;
+        return json(res, 202, { accepted });
+      }
+      if (pathname === '/shutdown' && req.method === 'POST') {
+        json(res, 200, { ok: true });
+        onShutdown?.();
+        return;
       }
       if (pathname === '/stream' && req.method === 'GET') {
         res.writeHead(200, {
@@ -163,6 +209,7 @@ export function startServer({
         state,
         ingest,
         close() {
+          stopSites();
           clearInterval(sweeper);
           clearInterval(heartbeat);
           for (const res of clients) res.end();
