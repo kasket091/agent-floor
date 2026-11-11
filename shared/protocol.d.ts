@@ -17,6 +17,8 @@ export interface InboundEvent {
   task?: string;
   to?: string | string[];
   subagent?: { key?: string; type?: string };
+  /** A permanent skill-staff employee: never swept. */
+  staff?: boolean;
   ts?: number;
 }
 
@@ -27,6 +29,7 @@ export interface FloorEvent {
   name?: string;
   role?: string;
   source?: string;
+  staff?: boolean;
   parent?: string;
   team?: string;
   teamName?: string;
@@ -63,6 +66,7 @@ export interface Agent {
   lastSeen: number;
   history: HistoryEntry[];
   boundKey?: string;
+  staff?: boolean;
 }
 
 export interface Team {

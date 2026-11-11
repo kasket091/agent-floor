@@ -27,8 +27,8 @@ test('SessionStart joins the lead in the Lobby', () => {
   assert.equal(ev.type, 'join');
   assert.equal(ev.agent, LEAD);
   assert.equal(ev.team, 'lobby');
-  assert.equal(ev.teamName, 'Lobby');
-  assert.deepEqual(LOBBY, { id: 'lobby', name: 'Lobby' });
+  assert.equal(ev.teamName, "Manager's Office");
+  assert.deepEqual(LOBBY, { id: 'lobby', name: "Manager's Office" });
 });
 
 test('a site MCP tool moves the session; later tools stay in that room', () => {

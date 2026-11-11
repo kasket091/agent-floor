@@ -67,6 +67,7 @@ export function normalizeEvent(raw, now = Date.now()) {
     name: clip(raw.name ?? agentRaw.name, 40),
     role: clip(raw.role ?? agentRaw.role, 40),
     source: clip(raw.source ?? agentRaw.source, 32),
+    staff: raw.staff === true ? true : undefined,
     parent: raw.parent != null ? String(raw.parent).slice(0, 128) : undefined,
     team: teamName ? slug(teamRaw.id ?? teamName) : undefined,
     teamName,
@@ -134,6 +135,7 @@ function ensureAgent(state, ev, now) {
       lastSeen: now,
       history: [],
       boundKey: undefined,
+      staff: ev.staff || undefined,
     };
   } else {
     if (ev.name) agent.name = ev.name;
@@ -277,6 +279,7 @@ export function sweep(
 ) {
   const removed = [];
   for (const a of Object.values(state.agents)) {
+    if (a.staff) continue;
     const age = now - a.lastSeen;
     if (
       (a.status === 'offline' && age > offlineMs) ||

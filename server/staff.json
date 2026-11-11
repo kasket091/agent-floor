@@ -1,0 +1,30 @@
+{
+  "rooms": [
+    {
+      "id": "build",
+      "name": "Build",
+      "roles": [
+        { "tag": "section", "label": "Section helper", "desks": 3 },
+        { "tag": "laptop", "label": "Laptop breakpoint", "desks": 1 },
+        { "tag": "tablet", "label": "Tablet breakpoint", "desks": 1 },
+        { "tag": "mobile", "label": "Mobile breakpoint", "desks": 1 },
+        { "tag": "header", "label": "Header agent", "desks": 1 },
+        { "tag": "footer", "label": "Footer agent", "desks": 1 },
+        { "tag": "evidence", "label": "Evidence runner", "desks": 1 },
+        { "tag": "reviewer", "label": "Reviewer", "desks": 3 },
+        { "tag": "sweeper", "label": "Sweeper", "desks": 1 },
+        { "tag": "escalation", "label": "Escalation specialist", "desks": 1 }
+      ]
+    },
+    {
+      "id": "qa-rework",
+      "name": "QA Rework",
+      "roles": [
+        { "tag": "batch", "label": "Batch agent", "desks": 4 },
+        { "tag": "evidence", "label": "Evidence runner", "desks": 1 },
+        { "tag": "reviewer", "label": "Reviewer", "desks": 2 },
+        { "tag": "escalation", "label": "Escalation specialist", "desks": 1 }
+      ]
+    }
+  ]
+}

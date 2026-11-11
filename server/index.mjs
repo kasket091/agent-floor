@@ -15,6 +15,7 @@ import { applyEvent, createState, normalizeEvent, sweep, PROTOCOL_VERSION } from
 import { createClaudeIngest } from './claude-ingest.mjs';
 import { redactDeep } from './redact.mjs';
 import { DEFAULT_CONFIG, watchSites } from './sites.mjs';
+import { loadRoster, staffEvents, STAFF_ROOMS } from './staff.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const MAX_BODY = 256 * 1024;
@@ -44,6 +45,7 @@ export function startServer({
   const clients = new Set();
   let sites = [];
   let rooms; // the last `rooms` event, re-applied after every reset
+  const staff = staffEvents(loadRoster());
 
   function broadcast(name, data) {
     const frame = `event: ${name}\ndata: ${JSON.stringify(data)}\n\n`;
@@ -55,9 +57,16 @@ export function startServer({
     if (!ev) return false;
     const { effects } = applyEvent(state, ev);
     broadcast('event', { event: ev, effects });
-    if (ev.type === 'reset' && rooms) ingest(rooms);
+    if (ev.type === 'reset') {
+      if (rooms) ingest(rooms);
+      staff.forEach(ingest);
+    }
     return true;
   }
+
+  rooms = { type: 'rooms', rooms: STAFF_ROOMS };
+  ingest(rooms);
+  staff.forEach(ingest);
 
   const ingestClaude = createClaudeIngest({ getSites: () => sites, getState: () => state });
   const stopSites = watchSites(
@@ -65,7 +74,7 @@ export function startServer({
     (list) => {
       try {
         sites = list;
-        rooms = { type: 'rooms', rooms: list.map((s) => ({ id: s.host, name: s.name })) };
+        rooms = { type: 'rooms', rooms: [...STAFF_ROOMS, ...list.map((s) => ({ id: s.host, name: s.name }))] };
         ingest(rooms);
       } catch (err) {
         log(`Could not update site rooms: ${err.message}`);

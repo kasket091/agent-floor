@@ -5,11 +5,11 @@ import { redactDeep } from './redact.mjs';
 import { siteForPayload } from './sites.mjs';
 import { applyPlan, planText } from './plan.mjs';
 
-export const LOBBY = { id: 'lobby', name: 'Lobby' };
+export const LOBBY = { id: 'lobby', name: "Manager's Office" };
 const PLAN_TOOL = 'mcp__ccd_turn__update_plan';
 export const OWNER = 'Mark Dave'; // the first Claude lead on the floor
 // Local first names, picked by a hash of the agent id: no AI, no tokens.
-const NAMES = ['Mia', 'Leo', 'Ava', 'Noah', 'Zoe', 'Liam', 'Ella', 'Finn', 'Ivy', 'Jack', 'Ruby', 'Owen', 'Nina', 'Hugo', 'Lily',
+export const NAMES = ['Mia', 'Leo', 'Ava', 'Noah', 'Zoe', 'Liam', 'Ella', 'Finn', 'Ivy', 'Jack', 'Ruby', 'Owen', 'Nina', 'Hugo', 'Lily',
   'Theo', 'Isla', 'Max', 'Cleo', 'Sam', 'Aria', 'Kai', 'Lucy', 'Eli', 'Rosa', 'Ben', 'Maya', 'Alex', 'Jade', 'Oscar',
   'Tess', 'Ravi', 'Lena', 'Jon', 'Kira', 'Milo', 'Sara', 'Toby', 'Nora', 'Ezra'];
 
