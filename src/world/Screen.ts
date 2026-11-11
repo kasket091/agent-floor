@@ -1,3 +1,4 @@
+import { BRAND } from './brand';
 import { MeshBasicMaterial } from 'three';
 import type { Agent, Status } from '../../shared/protocol';
 import { STATUS_COLORS, STATUS_LABEL } from './palette';
@@ -168,7 +169,7 @@ export function sideScreenMaterial(i: number) {
     ctx.fillRect(16, 16, 120, 12);
     ctx.fillStyle = '#c9d1d9';
     for (let y = 40; y < 150; y += 12) ctx.fillRect(16, y, 140 + ((y * 7) % 80), 5);
-    ctx.fillStyle = '#ff5f2e';
+    ctx.fillStyle = BRAND.purple;
     ctx.fillRect(16, 100, 60, 5);
   } else if (k === 1) {
     // Terminal

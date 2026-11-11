@@ -1,3 +1,4 @@
+import { BRAND } from './brand';
 import { BoxGeometry, Group, Mesh, MeshBasicMaterial, Object3D, RingGeometry, Sprite, SpriteMaterial, TorusGeometry, Vector3, type Material } from 'three';
 import { Kit } from './kit';
 import type { Agent, Status } from '../../shared/protocol';
@@ -186,7 +187,7 @@ export class Character {
     this.statusRing.position.y = 0.075;
     this.root.add(this.statusRing);
 
-    this.selectRing = new Mesh(selectGeo, new MeshBasicMaterial({ color: '#ff5f2e', toneMapped: false }));
+    this.selectRing = new Mesh(selectGeo, new MeshBasicMaterial({ color: BRAND.purple, toneMapped: false }));
     this.selectRing.rotation.x = -Math.PI / 2;
     this.selectRing.position.y = 0.08;
     this.selectRing.scale.setScalar(0.001);
@@ -235,7 +236,7 @@ export class Character {
     k.add(headbandGeo, dark, 0, 0.02, 0);
     for (const side of [-1, 1]) k.add(G.cyl(0.07, 0.07, 0.06, 12), dark, side * 0.26, 0, 0, { rz: Math.PI / 2 });
     k.add(G.capsule(0.012, 0.16), dark, -0.2, -0.12, -0.12, { rx: 0.6, rz: 0.9 });
-    k.add(G.sphere(0.025, 8, 6), clay('#ff5f2e'), -0.13, -0.17, -0.2);
+    k.add(G.sphere(0.025, 8, 6), clay(BRAND.purple), -0.13, -0.17, -0.2);
   }
 
   // ---------------------------------------------------------------- commands

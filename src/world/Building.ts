@@ -1,6 +1,7 @@
 import { Group, MeshStandardMaterial, PlaneGeometry, Vector3, type Camera } from 'three';
 import { disposeKit, Kit } from './kit';
-import { G } from './materials';
+import { clay, G } from './materials';
+import { BRAND } from './brand';
 import { damp } from './motion';
 import { PALETTES, hash, type ThemeName } from './palette';
 import {
@@ -356,16 +357,18 @@ export class Building {
     wk.add(G.rbox(2.2, 0.12, 4.2, 0.03), this.westFrameFade, x0 - 1.1, 2.95, 0);
 
     // Logo wall, reception, waiting area.
-    wk.add(G.box(6.4, 2.2, 0.06), M.wood(), lx + 0.6, 1.65, Z0 + 0.04);
+    wk.add(G.box(7.0, 2.6, 0.04), clay(BRAND.paleLilac, { roughness: 0.9 }), lx + 0.6, 1.6, Z0 + 0.02);
+    wk.add(G.box(6.4, 2.2, 0.06), clay(BRAND.purple, { roughness: 0.8 }), lx + 0.6, 1.65, Z0 + 0.04);
     wk.add(new PlaneGeometry(5.6, 1.4), logoMaterial(), lx + 0.6, 1.75, Z0 + 0.075, { cast: false });
     clock(wk, lx - 3.6, 2.5, Z0 + 0.06, 0);
+    k.add(G.rbox(5.2, 0.02, 3.0, 0.02), clay(BRAND.paleLilac, { roughness: 1 }), lx + 0.6, 0.012, Z0 + 3.4, { cast: false });
     receptionDesk(k, lx + 0.6, Z0 + 3.6, 0, 3.2);
     plantTall(k, lx - 3.4, Z0 + 0.8, 3);
     plantTall(k, lx + 4.3, Z0 + 0.8, 0);
-    k.add(G.rbox(4.6, 0.02, 3.2, 0.02), M.charcoal(), lx + 0.4, 0.012, Z1 - 3.6, { cast: false });
-    sofa(k, lx + 0.4, Z1 - 2.3, Math.PI, 2.6, '#4a6fa5');
-    armchair(k, lx - 2.0, Z1 - 3.8, Math.PI / 2, '#c8734f');
-    armchair(k, lx + 2.8, Z1 - 3.8, -Math.PI / 2, '#d6a84f');
+    k.add(G.rbox(4.6, 0.02, 3.2, 0.02), clay(BRAND.lilac, { roughness: 1 }), lx + 0.4, 0.012, Z1 - 3.6, { cast: false });
+    sofa(k, lx + 0.4, Z1 - 2.3, Math.PI, 2.6, BRAND.purple);
+    armchair(k, lx - 2.0, Z1 - 3.8, Math.PI / 2, '#9D6BD8');
+    armchair(k, lx + 2.8, Z1 - 3.8, -Math.PI / 2, '#9D6BD8');
     coffeeTable(k, lx + 0.4, Z1 - 3.8, 0, 1.4, 0.7);
     plantTall(k, x0 + 0.9, Z1 - 0.9, 3);
     plantTall(k, lx + 4.4, Z1 - 0.9, 2);
@@ -374,7 +377,7 @@ export class Building {
     k.add(G.rbox(1.4, 0.02, 2.4, 0.02), M.charcoal(), x0 + 0.9, 0.012, 0, { cast: false });
     waterCooler(k, x0 + 0.5, -2.6, Math.PI / 2);
     kanban(k, x0 + 0.04, 1.6, 3.2, Math.PI / 2, 1.6);
-    for (const x of [lx - 2.5, lx + 0.6, lx + 3.4]) pendant(k, x, Z0 + 3.6, 2.4, '#ff5f2e');
+    for (const x of [lx - 2.5, lx + 0.6, lx + 3.4]) pendant(k, x, Z0 + 3.6, 2.4, BRAND.purple);
     hangingPlant(k, lx - 3.4, Z1 - 2.4, 2.0);
     hangingPlant(k, lx + 4.3, -4.2, 2.1);
     for (const z of [-CORRIDOR / 2, CORRIDOR / 2]) k.add(G.rbox(0.4, WALL_H, 0.4, 0.04), M.offWhite(), x0 + LOBBY_WIDTH, WALL_H / 2, z);
@@ -499,7 +502,7 @@ export class Building {
         vendingMachine(k, w / 2 - 0.6, back + 0.6, 0);
         plantTall(k, -w / 2 + 0.5, back + 0.5);
         boxes(k, w / 2 - 0.6, d / 2 - 0.8, 0.3);
-        for (const x of [-0.8, 0.8]) pendant(k, x, -0.4, 2.3, '#ff5f2e');
+        for (const x of [-0.8, 0.8]) pendant(k, x, -0.4, 2.3, BRAND.lilac);
         break;
       }
       case 'booths': {

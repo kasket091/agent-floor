@@ -1,3 +1,4 @@
+import { BRAND } from './brand';
 import { BoxGeometry, DoubleSide, MeshBasicMaterial, MeshStandardMaterial, PlaneGeometry, type BufferGeometry } from 'three';
 import { Kit } from './kit';
 import { clay, G, themedMat } from './materials';
@@ -508,10 +509,10 @@ export function island(k: Kit, x: number, z: number, ry: number, w = 2.2) {
 
 export function receptionDesk(k: Kit, x: number, z: number, ry: number, w = 2.8) {
   k.push(x, 0, z, ry);
-  k.add(G.rbox(w, 1.05, 0.5, 0.04), M.white(), 0, 0.525, 0.3);
-  k.add(G.box(w - 0.1, 0.06, 0.02), clay('#ff5f2e'), 0, 0.82, 0.56, { cast: false });
-  k.add(G.rbox(w + 0.1, 0.04, 0.62, 0.02), M.wood(), 0, 1.07, 0.3);
-  k.add(G.rbox(w, 0.75, 0.6, 0.02), M.offWhite(), 0, 0.375, -0.2);
+  k.add(G.rbox(w, 1.05, 0.5, 0.04), clay(BRAND.purple), 0, 0.525, 0.3);
+  k.add(G.box(w - 0.1, 0.06, 0.02), clay(BRAND.lilac), 0, 0.82, 0.56, { cast: false });
+  k.add(G.rbox(w + 0.1, 0.04, 0.62, 0.02), clay(BRAND.amber, { roughness: 0.5 }), 0, 1.07, 0.3);
+  k.add(G.rbox(w, 0.75, 0.6, 0.02), clay(BRAND.purple), 0, 0.375, -0.2);
   k.add(G.rbox(0.5, 0.32, 0.03, 0.01), M.black(), -0.4, 1.05, -0.2, { ry: 0.2 });
   k.add(G.box(0.46, 0.27, 0.01), M.screen(), -0.4, 1.05, -0.182, { ry: 0.2, cast: false });
   plantSmall(k, w / 2 - 0.25, 1.09, 0.3);

@@ -1,5 +1,5 @@
+import { BRAND } from './brand';
 import { CanvasTexture, MeshStandardMaterial, RepeatWrapping, SRGBColorSpace, type Texture } from 'three';
-import { UI_FONT } from './text';
 import { REC } from './quality';
 
 // Procedural textures, drawn once and shared. No image files ship with the app.
@@ -204,7 +204,7 @@ export const clockMaterial = () =>
       ctx.moveTo(64, 64);
       ctx.lineTo(90, 72);
       ctx.stroke();
-      ctx.strokeStyle = '#ff5f2e';
+      ctx.strokeStyle = BRAND.purple;
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(64, 64);
@@ -215,28 +215,20 @@ export const clockMaterial = () =>
   });
 
 /** The big lobby wall sign. */
+/** The Digital Recipe wordmark (white SVG) for the lobby's purple logo wall. */
 export const logoMaterial = () =>
   matOnce('logo', () => {
-    const t = canvas(1024, 256, (ctx) => {
-      ctx.clearRect(0, 0, 1024, 256);
-      const s = 36;
-      const ox = 40;
-      const oy = 128 - s - 3;
-      ctx.fillStyle = '#ff5f2e';
-      ctx.beginPath();
-      ctx.roundRect(ox, oy, s, s, 9);
-      ctx.fill();
-      ctx.fillStyle = '#8a94a6';
-      for (const [dx, dy] of [[1, 0], [0, 1], [1, 1]]) {
-        ctx.beginPath();
-        ctx.roundRect(ox + dx * (s + 6), oy + dy * (s + 6), s, s, 9);
-        ctx.fill();
-      }
-      ctx.fillStyle = '#1e2430';
-      ctx.font = `700 112px ${UI_FONT}`;
-      ctx.textBaseline = 'middle';
-      ctx.fillText('Agent Floor', 150, 132);
-    });
+    const t = canvas(1024, 256, (ctx) => ctx.clearRect(0, 0, 1024, 256));
+    const img = new Image();
+    img.onload = () => {
+      const c = t.image as HTMLCanvasElement;
+      const ctx = c.getContext('2d')!;
+      const w = c.width * 0.84;
+      const h = (w * img.naturalHeight) / img.naturalWidth;
+      ctx.drawImage(img, (c.width - w) / 2, (c.height - h) / 2, w, h);
+      t.needsUpdate = true; // the canvas was blank until the SVG arrived
+    };
+    img.src = '/brand/dr-wordmark.svg';
     return new MeshStandardMaterial({ map: t, transparent: true, roughness: 0.5 });
   });
 
