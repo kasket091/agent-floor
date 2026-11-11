@@ -110,9 +110,11 @@ The full event format is in [docs/protocol.md](docs/protocol.md). More integrati
 | `AGENT_FLOOR_HOST` | `127.0.0.1` | server |
 | `AGENT_FLOOR_URL` | `http://127.0.0.1:4317` | hooks, `emit`, `demo` |
 | `AGENT_FLOOR_TEAM` | Claude Code: the Lobby (site rooms still apply). Codex, Cursor: project folder name | Claude Code: floor-wide, every session goes to this room. Set it in the environment the floor starts in (the first hook that launches the floor passes its own). Codex, Cursor: per session, from the hook's environment |
-| `AGENT_FLOOR_NAME` | `Claude`, `Codex`, `Cursor` | the lead's display name. Claude Code: floor-wide, set in the environment when the floor starts. Codex, Cursor: per session |
+| `AGENT_FLOOR_NAME` | `Codex`, `Cursor`; Claude Code: see below | the lead's display name. Claude Code: floor-wide, set in the environment when the floor starts, and replaces the names below. Codex, Cursor: per session |
 | `AGENT_FLOOR_AUTOLAUNCH` | `1` | set to `0` so hooks never open the app |
 | `AGENT_FLOOR_CLAUDE_CONFIG` | `~/.claude.json` | server: where to read WordPress MCP connections for site rooms |
+
+Claude Code names: the first lead on the floor is **Mark Dave** (the owner, `OWNER` in `server/claude-ingest.mjs`). Each later lead and every helper gets a first name from a built-in list, picked from its id, so it keeps that name; the helper's job shows beside it. When Mark Dave's session leaves, the next new session gets the name. No AI is used, so names cost no tokens.
 
 ## Privacy and safety
 

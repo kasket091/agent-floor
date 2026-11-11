@@ -141,6 +141,20 @@ test('quiet snoozes auto-open (default 6 hours)', () => {
   assert.ok(Math.abs(one - (Date.now() + 3600_000)) < 60_000);
 });
 
+test('starting the floor by hand lifts a stop or quiet pause', async () => {
+  const port = await freePort();
+  const e = { AGENT_FLOOR_HOME: fs.mkdtempSync(join(tmp, 'state-')) };
+  assert.equal(cli(['quiet'], e).status, 0);
+  assert.ok(fs.existsSync(join(e.AGENT_FLOOR_HOME, 'snoozed-until')));
+  const child = spawn(process.execPath, [SELF, 'start', '--port', String(port)], { env: { ...env, ...e }, stdio: 'ignore' });
+  try {
+    for (let i = 0; i < 50 && fs.existsSync(join(e.AGENT_FLOOR_HOME, 'snoozed-until')); i++) await sleep(100);
+    assert.ok(!fs.existsSync(join(e.AGENT_FLOOR_HOME, 'snoozed-until')));
+  } finally {
+    child.kill();
+  }
+});
+
 test('stop shuts a running floor down and says whether one was running', async () => {
   const port = await freePort();
   const portEnv = { AGENT_FLOOR_PORT: String(port) };

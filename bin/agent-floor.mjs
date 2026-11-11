@@ -344,6 +344,7 @@ async function setup(args) {
 // ---------------------------------------------------------------- start
 async function start(args) {
   const f = flags(args);
+  require('./state.cjs').unsnooze(); // started on purpose: undoes stop / quiet, like opening the app
   const { startServer } = await import('../server/index.mjs');
   const port = Number(f.port) || undefined;
   const host = f.host || undefined;

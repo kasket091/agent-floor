@@ -131,3 +131,31 @@ test('a quoted curl -u application password never reaches the activity text', ()
     for (const g of app.split(' ')) assert.ok(!text.includes(g), `leaked ${g}: ${text}`);
   }
 });
+
+test('the first Claude lead is Mark Dave; later leads and helpers get stable random names', () => {
+  const agents = {};
+  const ingest = createClaudeIngest({ getSites: () => SITES, getState: () => ({ agents }) });
+  const first = normalizeEvent(ingest(p('SessionStart'))[0]);
+  assert.equal(first.name, 'Mark Dave');
+  agents[first.agent] = { id: first.agent, name: first.name, status: 'idle' };
+
+  const second = normalizeEvent(ingest(p('SessionStart', { session_id: 's2' }))[0]);
+  assert.notEqual(second.name, 'Mark Dave');
+  assert.notEqual(second.name, 'Claude');
+  agents[second.agent] = { id: second.agent, name: second.name, status: 'idle' };
+  const again = normalizeEvent(ingest(p('UserPromptSubmit', { session_id: 's2', prompt: 'hi' }))[0]);
+  assert.equal(again.name, second.name, 'a session keeps its name');
+
+  const spawn = ingest(p('PreToolUse', { tool_name: 'Agent', tool_use_id: 'tu_1', tool_input: { subagent_type: 'code-reviewer', description: 'Review' } }));
+  const helper = normalizeEvent(spawn.find((e) => e.type === 'join'));
+  assert.equal(helper.role, 'code-reviewer');
+  assert.ok(!['Mark Dave', 'Code Reviewer', second.name].includes(helper.name), helper.name);
+  const spawnAgain = ingest(p('PreToolUse', { tool_name: 'Agent', tool_use_id: 'tu_1', tool_input: { subagent_type: 'code-reviewer', description: 'Review' } }));
+  assert.equal(normalizeEvent(spawnAgain.find((e) => e.type === 'join')).name, helper.name, 'same helper, same name');
+});
+
+test('Mark Dave passes to the next new lead once the first one has left', () => {
+  const agents = { 'claude-code:old': { id: 'claude-code:old', name: 'Mark Dave', status: 'offline' } };
+  const ingest = createClaudeIngest({ getSites: () => SITES, getState: () => ({ agents }) });
+  assert.equal(normalizeEvent(ingest(p('SessionStart', { session_id: 's3' }))[0]).name, 'Mark Dave');
+});
