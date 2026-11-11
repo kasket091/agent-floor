@@ -127,7 +127,7 @@ function ensureAgent(state, ev, now) {
       role: ev.role || 'Agent',
       team: teamId,
       source: ev.source || 'custom',
-      parent: ev.parent,
+      parent: ev.parent || undefined,
       status: 'idle',
       activity: undefined,
       tool: undefined,
@@ -141,7 +141,7 @@ function ensureAgent(state, ev, now) {
     if (ev.name) agent.name = ev.name;
     if (ev.role) agent.role = ev.role;
     if (ev.source) agent.source = ev.source;
-    if (ev.parent) agent.parent = ev.parent;
+    if (ev.parent !== undefined) agent.parent = ev.parent || undefined; // '' clears it
     if (ev.team && ev.team !== agent.team) agent.team = ev.team;
     agent.lastSeen = now;
   }

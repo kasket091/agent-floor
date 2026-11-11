@@ -127,3 +127,13 @@ test('browser store keeps pinned rooms when agents are removed', async () => {
   assert.ok(store.state.teams['site-com']);
   assert.equal(store.state.teams.other, undefined);
 });
+
+test('an empty parent clears the parent; a missing one keeps it', () => {
+  const s = createState();
+  run(s, { type: 'join', agent: 'lead' });
+  run(s, { type: 'status', agent: 'kid', parent: 'lead', status: 'working' });
+  run(s, { type: 'status', agent: 'kid', status: 'working' });
+  assert.equal(s.agents.kid.parent, 'lead');
+  run(s, { type: 'status', agent: 'kid', parent: '', status: 'idle' });
+  assert.equal(s.agents.kid.parent, undefined);
+});

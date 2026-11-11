@@ -84,6 +84,7 @@ export function startServer({
   );
 
   const sweeper = setInterval(() => {
+    for (const ev of ingestClaude.tick(Date.now())) ingest(ev);
     const teams = Object.keys(state.teams).length;
     const removed = sweep(state);
     // Also when only a team went (an unpinned empty room), so browsers prune it too.
