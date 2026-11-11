@@ -24,7 +24,7 @@ export function createStaffDesk({ getState }) {
   const rooms = new Map(loadRoster().rooms.map((r) => [r.id, r]));
   // id -> { id, home?, name?, role?, session?, lead?, agent?, ts }. Staff have a home room; extras do not.
   const workers = new Map();
-  const byTool = new Map(); // spawn tool_use_id -> { w, sid }
+  const byTool = new Map(); // spawn tool_use_id -> { w, sid, type }
   // shortcut: links live until SessionEnd; a session that never ends keeps a few short strings, fine for a local server.
   const byAgent = new Map(); // subagent agent_id -> { w, sid }
   let extras = 0;
@@ -59,9 +59,12 @@ export function createStaffDesk({ getState }) {
   function wake(w, sid, lead, activity, now) {
     Object.assign(w, { session: sid, lead, agent: undefined, ts: now });
     workers.set(w.id, w); // an extra coming back for a resumed agent
-    return w.home
-      ? { type: 'status', agent: w.id, parent: lead, status: 'working', activity }
-      : { type: 'join', agent: w.id, name: w.name, role: w.role, parent: lead, source: 'claude-code', status: 'working', activity };
+    if (!w.home) return [{ type: 'join', agent: w.id, name: w.name, role: w.role, parent: lead, source: 'claude-code', status: 'working', activity }];
+    // A join's parent briefs the newcomer; an employee already exists, so the lead briefs it with a message.
+    return [
+      { type: 'status', agent: w.id, parent: lead, status: 'working', activity },
+      { type: 'message', agent: lead, to: w.id, text: activity ?? 'Picking up again' },
+    ];
   }
 
   function goHome(w) {
@@ -91,8 +94,8 @@ export function createStaffDesk({ getState }) {
       const match = roleFor(p.tool_input, session.skill);
       if (match) {
         const w = pick(match, session);
-        if (p.tool_use_id) byTool.set(p.tool_use_id, { w, sid });
-        out = [...out.filter((e) => e.type !== 'join'), wake(w, sid, lead, match.rest, now)];
+        if (p.tool_use_id) byTool.set(p.tool_use_id, { w, sid, type: p.tool_input?.subagent_type || 'general-purpose' });
+        out = [...out.filter((e) => e.type !== 'join'), ...wake(w, sid, lead, match.rest, now)];
       }
     } else if (spawn && p.hook_event_name === 'PostToolUse' && byTool.has(p.tool_use_id)) {
       const { w } = byTool.get(p.tool_use_id);
@@ -107,14 +110,23 @@ export function createStaffDesk({ getState }) {
       if (w.session === sid && r?.isAsync !== true) home.push(...goHome(w));
     }
 
-    const link = p.agent_id != null ? byAgent.get(String(p.agent_id)) : undefined;
+    let link = p.agent_id != null ? byAgent.get(String(p.agent_id)) : undefined;
+    if (!link && p.agent_id != null) {
+      // Before its spawn's PostToolUse (always, for a foreground call): the oldest pending spawn of this type.
+      for (const v of byTool.values()) {
+        if (v.sid !== sid || v.w.session !== sid || v.w.agent || v.type !== p.agent_type) continue;
+        v.w.agent = String(p.agent_id);
+        byAgent.set(v.w.agent, (link = { w: v.w, sid }));
+        break;
+      }
+    }
     const w = link?.w;
     if (w && !(w.session && w.agent !== String(p.agent_id))) {
       if (p.hook_event_name === 'SubagentStop') {
         out = out.filter((e) => !e.subagent); // no "Finished" helper desk
         if (w.session) home.push(...goHome(w));
       } else if (out.some((e) => e.subagent)) {
-        const back = w.session ? [] : [wake(w, sid, lead, undefined, now)]; // a resumed agent
+        const back = w.session ? [] : wake(w, sid, lead, undefined, now); // a resumed agent
         w.agent = String(p.agent_id);
         w.ts = now;
         out = [...back, ...out.map((e) => {

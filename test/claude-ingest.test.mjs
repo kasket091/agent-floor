@@ -352,3 +352,33 @@ test('an untagged haiku or fable helper in a figma skill session takes that skil
   assert.equal(state.agents['staff:qa-rework:escalation:1'].activity, 'Hard one');
   assert.deepEqual(helpers(state), [`${LEAD}:tu3`]);
 });
+
+test('the lead briefs each employee it wakes, also when an agent resumes', () => {
+  const { state, ingest } = office();
+  const briefs = [];
+  const feed = (payload) => ingest(payload).forEach((e) => {
+    for (const fx of applyEvent(state, normalizeEvent(e)).effects) if (fx.kind === 'message' && fx.from === LEAD) briefs.push([fx.to, fx.text]);
+  });
+  feed(p('PreToolUse', SITE_TOOL));
+  feed(p('UserPromptSubmit', { prompt: 'go' }));
+  feed(spawn('tu_1', '[build:reviewer] Review hero section'));
+  assert.deepEqual(briefs, [[REVIEWER, 'Review hero section']]);
+  assert.equal(state.agents[LEAD].status, 'working', 'the brief does not change the lead');
+  feed(launched('tu_1', AGENT_ID));
+  feed(stop(AGENT_ID));
+  feed(p('PreToolUse', { agent_id: AGENT_ID, agent_type: 'general-purpose', tool_name: 'Read', tool_input: { file_path: '/x/a.ts' } }));
+  assert.equal(briefs.length, 2);
+  assert.equal(briefs[1][0], REVIEWER);
+});
+
+test("a foreground spawn's inner tool calls show on the employee before its PostToolUse", () => {
+  const { state, feed } = office();
+  feed(p('PreToolUse', SITE_TOOL));
+  feed(spawn('tu_1', '[build:reviewer] Review hero section'));
+  feed(spawn('tu_2', 'Explore code', { tool_input: { description: 'Explore code', subagent_type: 'Explore' } }));
+  feed(p('PreToolUse', { agent_id: 'f1', agent_type: 'general-purpose', tool_name: 'Read', tool_input: { file_path: '/x/a.ts' } }));
+  assert.deepEqual([state.agents[REVIEWER].tool, state.agents[REVIEWER].status], ['Read', 'working']);
+  assert.deepEqual(helpers(state), [`${LEAD}:tu2`], 'no extra helper desk for the reviewer');
+  feed(launched('tu_1', 'f1', false));
+  assert.deepEqual([state.agents[REVIEWER].team, state.agents[REVIEWER].activity], ['build', 'Standby']);
+});
