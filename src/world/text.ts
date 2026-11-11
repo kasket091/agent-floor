@@ -1,7 +1,7 @@
 import { CanvasTexture, LinearFilter, LinearMipmapLinearFilter, SRGBColorSpace } from 'three';
 import { REC } from './quality';
 
-export const UI_FONT = '"Geist Variable", system-ui, sans-serif';
+export const UI_FONT = '"Inter Variable", system-ui, sans-serif';
 export const MONO_FONT = '"Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace';
 
 export function makeCanvas(w: number, h: number) {

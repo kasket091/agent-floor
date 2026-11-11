@@ -116,6 +116,8 @@ The full event format is in [docs/protocol.md](docs/protocol.md). More integrati
 
 Idle leads take breaks: after a minute or two of idle, a lead may walk to the kitchen or sit on the lounge sofa, then head back after a few minutes, or straight away when work comes in. Helpers stay at their desks. Reduced-motion turns it off.
 
+This fork is branded for Digital Recipe: the lobby logo wall, purple and lilac rooms, Inter and Montserrat, and the top bar. The brand values and room-colour rules live in `src/world/brand.ts`; status colours are left alone on purpose, so "Needs you" amber never mixes with the brand.
+
 Claude Code names: the first lead on the floor is **Mark Dave** (the owner, `OWNER` in `server/claude-ingest.mjs`). Each later lead and every helper gets a first name from a built-in list, picked from its id, so it keeps that name; the helper's job shows beside it. When Mark Dave's session leaves, the next new session gets the name. No AI is used, so names cost no tokens.
 
 ## Privacy and safety

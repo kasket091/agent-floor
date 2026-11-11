@@ -1,9 +1,9 @@
 /* Agent Floor HUD.
    Shape rule: floating panels are 18px, controls and chips are full pills,
-   code blocks are 12px. One accent (tangerine); status colours are semantic only. */
+   code blocks are 12px. One accent (Digital Recipe purple); status colours are semantic only. */
 
 :root {
-  --accent: #ff5f2e;
+  --accent: #5a15a0;
   --accent-ink: #ffffff;
   --text: #141821;
   --text-2: #586172;
@@ -28,6 +28,7 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
+    --accent: #7b3fc4;
     --text: #eef1f5;
     --text-2: #a3acbb;
     --text-3: #6f7889;
@@ -45,6 +46,7 @@
 }
 
 :root[data-theme='dark'] {
+  --accent: #7b3fc4;
   --text: #eef1f5;
   --text-2: #a3acbb;
   --text-3: #6f7889;
@@ -71,7 +73,7 @@ body {
   overflow: hidden;
   background: var(--bg);
   color: var(--text);
-  font: 400 14px/1.45 'Geist Variable', system-ui, -apple-system, sans-serif;
+  font: 400 14px/1.45 'Inter Variable', system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   transition: background-color 400ms ease;
 }
@@ -194,27 +196,26 @@ button {
   border-radius: 999px;
 }
 
-.mark {
-  display: grid;
-  grid-template-columns: 8px 8px;
-  gap: 2px;
+.brand-logo {
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #5a15a0;
 }
 
-.mark i {
-  width: 8px;
-  height: 8px;
-  border-radius: 2.5px;
-  background: var(--text-3);
+.brand-logo img {
+  display: block;
+  height: 15px;
+  width: auto;
 }
 
-.mark i:first-child {
-  background: var(--accent);
-}
-
-.brand-name {
-  font-weight: 650;
-  letter-spacing: -0.01em;
-  font-size: 15px;
+/* Digital Recipe headings: Montserrat, like digitalrecipe.com.au. */
+.sheet h2,
+.empty h2,
+.team-chip .team-name {
+  font-family: 'Montserrat Variable', 'Inter Variable', system-ui, sans-serif;
 }
 
 .mode {
@@ -1033,10 +1034,6 @@ button {
 /* ---------------------------------------------------------------- small screens */
 
 @media (max-width: 767px) {
-  .brand-name {
-    display: none;
-  }
-
   .hint {
     display: none;
   }

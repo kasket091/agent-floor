@@ -1,4 +1,5 @@
-import '@fontsource-variable/geist';
+import '@fontsource-variable/inter';
+import '@fontsource-variable/montserrat';
 import '@fontsource-variable/geist-mono';
 import './styles.css';
 import { connect, isDemoRunning, startDemo } from './core/connection';
@@ -33,7 +34,7 @@ let theme: ThemeName = savedTheme() || (systemDark.matches ? 'dark' : 'light');
 async function boot() {
   // Canvas textures draw text, so the fonts must be ready first.
   await Promise.race([
-    Promise.all([document.fonts.load('600 24px "Geist Variable"'), document.fonts.load('500 20px "Geist Mono Variable"')]),
+    Promise.all([document.fonts.load('600 24px "Inter Variable"'), document.fonts.load('700 24px "Montserrat Variable"'), document.fonts.load('500 20px "Geist Mono Variable"')]),
     new Promise((r) => setTimeout(r, 1500)),
   ]);
 

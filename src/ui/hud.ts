@@ -114,7 +114,7 @@ export class Hud {
     // Top bar
     const top = el('header', 'topbar');
     const brand = el('div', 'brand glass');
-    brand.innerHTML = `<span class="mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span class="brand-name">Agent Floor</span>`;
+    brand.innerHTML = `<span class="brand-logo"><img src="/brand/dr-wordmark.svg" alt="Digital Recipe" height="15"></span>`;
     brand.append(this.modePill);
     const tools = el('div', 'tools glass');
     const btn = (name: Parameters<typeof icon>[0], label: string, fn: () => void) => {
