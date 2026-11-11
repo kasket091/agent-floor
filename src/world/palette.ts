@@ -119,7 +119,12 @@ export function shirtFor(role: string) {
   return key === 'lead' ? BRAND.purple : SHIRTS[hash(key) % SHIRTS.length];
 }
 
-export function looksFor(id: string) {
+// The owner's lead (named on the server, OWNER in server/claude-ingest.mjs) always looks the same:
+// fair skin and dark hair with K-pop curtain bangs (hairStyle 5, used by no one else).
+const OWNER_NAME = 'Mark Dave';
+
+export function looksFor(id: string, name?: string) {
+  if (name === OWNER_NAME) return { skin: '#f6d5bd', hair: '#1f1a17', hairStyle: 5, glasses: false, pants: '#2b2f3a' };
   const h = hash(id);
   return {
     skin: SKIN[h % SKIN.length],

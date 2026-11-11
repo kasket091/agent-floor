@@ -240,7 +240,7 @@ export class Hud {
     const crew = Object.values(s.agents).filter((x) => x.parent === a.id);
     const hist = [...a.history].reverse().slice(0, 7);
     const color = STATUS_COLORS[a.status];
-    const look = looksFor(a.id);
+    const look = looksFor(a.id, a.name);
 
     this.card.innerHTML = `
       <div class="card-head">

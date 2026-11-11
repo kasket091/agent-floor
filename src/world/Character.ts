@@ -116,7 +116,7 @@ export class Character {
 
   constructor(agent: Agent) {
     this.id = agent.id;
-    const look = looksFor(agent.id);
+    const look = looksFor(agent.id, agent.name);
     this.phase = (look.hairStyle + 1) * 1.7;
     const shirt = clay(shirtFor(agent.role));
     const skin = clay(look.skin, { roughness: 0.7 });
@@ -224,6 +224,14 @@ export class Character {
     if (style === 4) {
       k.add(G.cyl(0.272, 0.272, 0.06, 18), hair, 0, 0.06, 0.02, { rx: -0.32 });
       k.add(G.sphere(0.06, 8, 6), hair, 0, 0.29, 0.08);
+    }
+    if (style === 5) {
+      // K-pop: fluffy volume on top and curtain bangs parted in the middle over the forehead (face is -Z).
+      k.add(G.sphere(0.2, 12, 8), hair, 0, 0.17, 0.0, { sx: 1.25, sy: 0.75, sz: 1.2 });
+      for (const side of [-1, 1]) {
+        k.add(G.rbox(0.2, 0.17, 0.07, 0.03), hair, side * 0.1, 0.1, -0.205, { rz: side * 0.32, rx: 0.2 });
+        k.add(G.rbox(0.07, 0.2, 0.18, 0.03), hair, side * 0.245, 0.0, -0.04);
+      }
     }
   }
 

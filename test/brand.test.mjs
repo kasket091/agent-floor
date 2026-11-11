@@ -51,3 +51,15 @@ test('lobby lilac pieces follow the theme: brand lilac by day, deep purple-ink a
     assert.ok(l < 0.3 && h * 360 >= 250 && h * 360 <= 305, `dark ${key} ${PALETTES.dark[key]}`);
   }
 });
+
+test('Mark Dave always gets his own look: fair skin, dark K-pop hair, no glasses', async () => {
+  const { looksFor } = await import('../src/world/palette.ts');
+  const a = looksFor('claude-code:aaaa', 'Mark Dave');
+  const b = looksFor('claude-code:bbbb', 'Mark Dave');
+  assert.deepEqual(a, b, 'same look whatever the session id');
+  assert.equal(a.skin, '#f6d5bd');
+  assert.equal(a.hair, '#1f1a17');
+  assert.equal(a.hairStyle, 5);
+  assert.equal(a.glasses, false);
+  assert.notEqual(looksFor('claude-code:aaaa', 'Mia').hairStyle, 5, 'other agents never get his hairstyle');
+});
