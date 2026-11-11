@@ -39,7 +39,8 @@ import { setNightGlow } from './props';
 import { applyThemeToMaterials } from './materials';
 import { prefersReducedMotion } from './motion';
 import { REC } from './quality';
-import { PALETTES, teamAccent, type ThemeName } from './palette';
+import { PALETTES, type ThemeName } from './palette';
+import { BRAND, roomAccent } from './brand';
 import { TeamRoom } from './TeamRoom';
 import { setDeskLamps, Workstation } from './Workstation';
 
@@ -439,7 +440,7 @@ export class World {
     from.character.lookAtWorld(b, 2.6, true);
     this.cb.onMessage(effect.from, effect.to, effect.text);
     const team = this.state?.teams[from.team];
-    const color = team ? teamAccent(team.hue).getStyle() : '#ff5f2e';
+    const color = team ? roomAccent(team).getStyle() : BRAND.purple;
     this.courier.send(a.add(new Vector3(0, 0.35, 0)), b.add(new Vector3(0, 0.35, 0)), color, this.reduced, () => {
       to.character.lookAtWorld(from.character.headWorld(), 1.8);
       this.courier.ripple(to.character.root.getWorldPosition(new Vector3()), color);

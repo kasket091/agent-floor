@@ -1,7 +1,8 @@
 import type { Agent, WorldState } from '../../shared/protocol';
 import type { ConnectionMode } from '../core/store';
 import type { Anchor } from '../world/World';
-import { looksFor, shirtFor, sourceLabel, STATUS_COLORS, STATUS_LABEL, teamAccent } from '../world/palette';
+import { looksFor, shirtFor, sourceLabel, STATUS_COLORS, STATUS_LABEL } from '../world/palette';
+import { roomAccent } from '../world/brand';
 import { icon } from './icons';
 import { REPO_URL } from '../config';
 
@@ -215,7 +216,7 @@ export class Hud {
     for (const t of teams) {
       const b = el('button', 'team-chip') as HTMLButtonElement;
       b.type = 'button';
-      b.innerHTML = `<span class="swatch" style="background:${teamAccent(t.hue).getStyle()}"></span><span class="team-name">${esc(t.name)}</span><span class="count">${counts.get(t.id) || 0}</span>${attention.get(t.id) ? '<span class="flag" title="Someone needs attention"></span>' : ''}`;
+      b.innerHTML = `<span class="swatch" style="background:${roomAccent(t).getStyle()}"></span><span class="team-name">${esc(t.name)}</span><span class="count">${counts.get(t.id) || 0}</span>${attention.get(t.id) ? '<span class="flag" title="Someone needs attention"></span>' : ''}`;
       b.addEventListener('click', () => this.actions.focusTeam(t.id));
       this.teamsDock.append(b);
     }

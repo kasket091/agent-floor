@@ -1,5 +1,5 @@
-import { Color } from 'three';
 import type { Status } from '../../shared/protocol';
+import { BRAND } from './brand.ts';
 
 export type ThemeName = 'light' | 'dark';
 
@@ -107,13 +107,9 @@ export function hash(value: string) {
   return h >>> 0;
 }
 
-const ROLE_SHIRT: Record<string, string> = {
-  lead: '#ff5f2e',
-};
-
 export function shirtFor(role: string) {
   const key = role.toLowerCase();
-  return ROLE_SHIRT[key] || SHIRTS[hash(key) % SHIRTS.length];
+  return key === 'lead' ? BRAND.purple : SHIRTS[hash(key) % SHIRTS.length];
 }
 
 export function looksFor(id: string) {
@@ -125,15 +121,6 @@ export function looksFor(id: string) {
     glasses: ((h >>> 12) & 7) === 0,
     pants: ['#2b2f3a', '#3a4252', '#4a3f35', '#23324a'][(h >>> 14) % 4],
   };
-}
-
-export function teamColor(hue: number, theme: ThemeName) {
-  const p = PALETTES[theme];
-  return new Color().setHSL(hue / 360, p.carpetSaturation, p.carpetLightness);
-}
-
-export function teamAccent(hue: number) {
-  return new Color().setHSL(hue / 360, 0.62, 0.55);
 }
 
 export function sourceLabel(source: string) {

@@ -12,7 +12,8 @@
     "skipLibCheck": true,
     "allowJs": false,
     "isolatedModules": true,
-    "noEmit": true
+    "noEmit": true,
+    "allowImportingTsExtensions": true
   },
   "include": ["src", "shared/*.d.ts"]
 }

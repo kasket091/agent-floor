@@ -3,7 +3,8 @@ import { PICK_LAYER } from './Character';
 import type { Agent, Team } from '../../shared/protocol';
 import { disposeKit, Kit } from './kit';
 import { G } from './materials';
-import { hash, STATUS_COLORS, teamAccent, teamColor, type ThemeName } from './palette';
+import { hash, STATUS_COLORS, type ThemeName } from './palette';
+import { roomAccent, roomCarpet } from './brand';
 import { CORRIDOR, OFFICE_D, type RoomLayout } from './layout';
 import {
   armchair,
@@ -60,7 +61,7 @@ export class TeamRoom {
   private decalMat: MeshBasicMaterial;
   private boardMat: MeshStandardMaterial;
   private dynamic = new Group();
-  private hue: number;
+  private ref: { id: string; order: number };
   private shapeKey = '';
   private boardKey = '';
   private signKey = '';
@@ -69,7 +70,7 @@ export class TeamRoom {
 
   constructor(team: Team, theme: ThemeName) {
     this.id = team.id;
-    this.hue = team.hue;
+    this.ref = { id: team.id, order: team.order };
     this.carpetMat = new MeshStandardMaterial({ map: carpetTiles(), roughness: 1 });
     this.rugMat = new MeshStandardMaterial({ roughness: 1 });
     this.signMat = new MeshBasicMaterial({ map: this.signTex.texture, transparent: true });
@@ -172,7 +173,7 @@ export class TeamRoom {
 
     // Lights over the pod and the lead desk.
     const cols = Math.max(1, Math.round(podW / 1.95));
-    const accentLamp = teamAccent(this.hue).getStyle();
+    const accentLamp = roomAccent(this.ref).getStyle();
     for (let i = 0; i < cols; i++) pendant(k, r.podLeft + 1.95 * (i + 0.5), 0, 2.35, i % 2 ? '#22252b' : accentLamp);
     if (r.hasLead) pendant(k, r.podLeft - 0.6, 0, 2.35, accentLamp);
     hangingPlant(k, podC + podW / 2 + 0.3, back + 1.0, 2.0);
@@ -214,8 +215,8 @@ export class TeamRoom {
 
   setTheme(theme: ThemeName) {
     const night = theme === 'dark';
-    this.carpetMat.color.copy(teamColor(this.hue, theme));
-    this.rugMat.color.copy(teamAccent(this.hue)).multiplyScalar(night ? 0.35 : 0.75);
+    this.carpetMat.color.copy(roomCarpet(this.ref, theme));
+    this.rugMat.color.copy(roomAccent(this.ref)).multiplyScalar(night ? 0.35 : 0.75);
     this.signKey = '';
     this.boardKey = '';
   }
@@ -229,7 +230,7 @@ export class TeamRoom {
       this.decor?.traverse((o) => {
         if (o instanceof Mesh && (o.material === bulbMat || o.material === offBulbMat)) o.material = this.empty ? offBulbMat : bulbMat;
       });
-      const accent = teamAccent(team.hue).getStyle();
+      const accent = roomAccent(team).getStyle();
       // Door sign: dark plate, light text.
       {
         const { ctx, canvas, texture } = this.signTex;
@@ -284,7 +285,7 @@ export class TeamRoom {
       const lines = wrap(ctx, team.task || 'No task posted yet', canvas.width - 72, 3);
       lines.forEach((l, i) => ctx.fillText(l, 36, 136 + i * 62));
       // Marker doodle: a hand-drawn underline.
-      ctx.strokeStyle = teamAccent(team.hue).getStyle();
+      ctx.strokeStyle = roomAccent(team).getStyle();
       ctx.lineWidth = 6;
       ctx.lineCap = 'round';
       ctx.beginPath();
