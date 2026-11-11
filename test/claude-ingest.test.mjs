@@ -159,3 +159,31 @@ test('Mark Dave passes to the next new lead once the first one has left', () => 
   const ingest = createClaudeIngest({ getSites: () => SITES, getState: () => ({ agents }) });
   assert.equal(normalizeEvent(ingest(p('SessionStart', { session_id: 's3' }))[0]).name, 'Mark Dave');
 });
+
+test('a helper that first shows up through its own tool calls gets a first name, not its id', async () => {
+  const { applyEvent, createState } = await import('../shared/protocol.js');
+  const state = createState();
+  const ingest = createClaudeIngest({ getSites: () => SITES, getState: () => state });
+  const feed = (payload) => ingest(payload).forEach((e) => applyEvent(state, normalizeEvent(e)));
+  feed(p('SessionStart'));
+  feed(p('PreToolUse', { agent_id: 'a95ac388e689d426a', tool_name: 'Read', tool_input: { file_path: '/x/a.ts' } }));
+  const helper = Object.values(state.agents).find((a) => a.parent === LEAD);
+  assert.ok(helper);
+  assert.ok(!/a95ac388/i.test(helper.name), helper.name);
+  assert.match(helper.name, /^[A-Z][a-z]+$/);
+  feed(p('PostToolUse', { agent_id: 'a95ac388e689d426a', tool_name: 'Read', tool_input: { file_path: '/x/a.ts' } }));
+  assert.equal(state.agents[helper.id].name, helper.name, 'keeps its name');
+});
+
+test('a spawned helper keeps its name when its own tool calls arrive', async () => {
+  const { applyEvent, createState } = await import('../shared/protocol.js');
+  const state = createState();
+  const ingest = createClaudeIngest({ getSites: () => SITES, getState: () => state });
+  const feed = (payload) => ingest(payload).forEach((e) => applyEvent(state, normalizeEvent(e)));
+  feed(p('SessionStart'));
+  feed(p('PreToolUse', { tool_name: 'Agent', tool_use_id: 'tu_9', tool_input: { subagent_type: 'Explore', description: 'Look' } }));
+  const helper = Object.values(state.agents).find((a) => a.parent === LEAD);
+  feed(p('PreToolUse', { agent_id: 'ag_1', agent_type: 'Explore', tool_name: 'Read', tool_input: { file_path: '/x/a.ts' } }));
+  assert.equal(Object.values(state.agents).filter((a) => a.parent === LEAD).length, 1);
+  assert.equal(state.agents[helper.id].name, helper.name);
+});

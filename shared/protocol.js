@@ -166,6 +166,7 @@ function resolveSubagent(state, ev) {
   const id = match ? match.id : `${parentId}:${key || slug(type || 'sub')}`;
   const next = { ...ev, agent: id, parent: parentId, role: ev.role || type };
   delete next.subagent;
+  if (match) delete next.name; // a name on a hint is only for a new desk, never a rename
   if (!match && key) {
     next.__bindKey = key;
   }

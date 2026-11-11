@@ -67,6 +67,8 @@ export function createClaudeIngest({ getSites, getState }) {
     for (const ev of out) {
       if (ev.agent === lead && ev.name) ev.name = process.env.AGENT_FLOOR_NAME || session.name;
       else if (ev.type === 'join' && ev.parent === lead) ev.name = nameFor(ev.agent, live);
+      // A helper seen only through its own tool calls: the reducer uses this name only for a new desk.
+      else if (ev.subagent) ev.name = nameFor(`${lead}:${ev.subagent.key ?? ev.subagent.type}`, live);
     }
     // normalizeEvent reads the room name only from an object team.
     return out.map((ev) => ({ ...ev, team: { ...session.room } }));
