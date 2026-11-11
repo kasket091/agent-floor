@@ -28,7 +28,7 @@ That's it. The next time a Claude Code session starts, Agent Floor opens by itse
 
 The commands below say `agent-floor`. Run `npm link` once in the repo to get that command, or use `node bin/agent-floor.mjs` in its place.
 
-Start a Claude Code session in any project. A character walks into the Lobby, sits down, and starts working. Each WordPress site you have connected as an MCP server gets its own room, and the session moves there when it touches that site. When it spawns a subagent, a new teammate walks in, gets briefed with a paper plane, works at its own desk, and reports back.
+Start a Claude Code session in any project. A character walks into the Manager's Office, sits down, and starts working. Each WordPress site you have connected as an MCP server gets its own room, and the session moves there when it touches that site. When it spawns a subagent, a new teammate walks in, gets briefed with a paper plane, works at its own desk, and reports back.
 
 No agents yet? Click **Watch demo**, or run `agent-floor demo` in a second terminal.
 
@@ -36,7 +36,7 @@ No agents yet? Click **Watch demo**, or run `agent-floor demo` in a second termi
 
 | On the floor | Means |
 | --- | --- |
-| An office block | The Lobby, or one WordPress site. Name above the door and on the corridor floor. The whiteboard shows the lead's current task-list step. |
+| An office block | The Manager's Office, or one WordPress site. Name above the door and on the corridor floor. The whiteboard shows the lead's current task-list step. |
 | Character at a desk | One agent. The lead sits at the head of the desk pod. |
 | Typing, code scrolling on the monitor | `working`: running a tool. The screen shows the tool and what it is doing. |
 | Hand on chin, thought bubble | `thinking` |
@@ -62,7 +62,7 @@ agent-floor setup claude --project   # prints a snippet for .claude/settings.jso
 
 Setup backs up your settings first, as `settings.json.before-agent-floor-<YYYY-MM-DD>` and `settings.json.bak`. Each hook is a `curl` one-liner that posts to `POST /hooks/claude`. If the floor is down, it starts it in the background with Node instead.
 
-Rooms come from `~/.claude.json`. Every MCP server whose URL contains `/wp-json/` gets a pinned room named after it. Only the names and URLs are read. Everything else goes in the Lobby.
+Rooms come from `~/.claude.json`. Every MCP server whose URL contains `/wp-json/` gets a pinned room named after it. Only the names and URLs are read. Everything else goes in the Manager's Office.
 
 Uses `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Notification`, `Stop`, `SubagentStop`, `PreCompact` and `SessionEnd`. Subagents spawned with the Task tool get their own desks and their tool calls show up on their own screens.
 
@@ -109,7 +109,7 @@ The full event format is in [docs/protocol.md](docs/protocol.md). More integrati
 | `AGENT_FLOOR_PORT` | `4317` | server, hooks |
 | `AGENT_FLOOR_HOST` | `127.0.0.1` | server |
 | `AGENT_FLOOR_URL` | `http://127.0.0.1:4317` | hooks, `emit`, `demo` |
-| `AGENT_FLOOR_TEAM` | Claude Code: the Lobby (site rooms still apply). Codex, Cursor: project folder name | Claude Code: floor-wide, every session goes to this room. Set it in the environment the floor starts in (the first hook that launches the floor passes its own). Codex, Cursor: per session, from the hook's environment |
+| `AGENT_FLOOR_TEAM` | Claude Code: the Manager's Office (site rooms still apply). Codex, Cursor: project folder name | Claude Code: floor-wide, every session goes to this room. Set it in the environment the floor starts in (the first hook that launches the floor passes its own). Codex, Cursor: per session, from the hook's environment |
 | `AGENT_FLOOR_NAME` | `Codex`, `Cursor`; Claude Code: see below | the lead's display name. Claude Code: floor-wide, set in the environment when the floor starts, and replaces the names below. Codex, Cursor: per session |
 | `AGENT_FLOOR_AUTOLAUNCH` | `1` | set to `0` so hooks never open the app |
 | `AGENT_FLOOR_CLAUDE_CONFIG` | `~/.claude.json` | server: where to read WordPress MCP connections for site rooms |
@@ -119,6 +119,8 @@ When a lead starts helpers, they hold a quick briefing: once the new helpers rea
 Idle leads take breaks: after a minute or two of idle, a lead may walk to the kitchen or sit on the lounge sofa, then head back after a few minutes, or straight away when work comes in. Helpers stay at their desks. Reduced-motion turns it off.
 
 This fork is branded for Digital Recipe: the lobby logo wall, purple and lilac rooms, Inter and Montserrat, and the top bar. The brand values and room-colour rules live in `src/world/brand.ts`; status colours are left alone on purpose, so "Needs you" amber never mixes with the brand.
+
+Staff rooms: the Build (14) and QA Rework (8) rooms hold standby employees. Start a helper's description with a role tag, e.g. `[build:reviewer] Review hero section`, and the matching employee walks to the client's room, works, then walks back to Standby. The tags are defined in the two Figma-to-Elementor skills and in `server/staff.json`. When several sites run in parallel and the standby staff run out, extras are named Lee Pay Kho, then Kram Evad, then random names. Leads go back to the Manager's Office after 5 minutes with no activity.
 
 Claude Code names: the first lead on the floor is **Mark Dave** (the owner, `OWNER` in `server/claude-ingest.mjs`). Each later lead and every helper gets a first name from a built-in list, picked from its id, so it keeps that name; the helper's job shows beside it. When Mark Dave's session leaves, the next new session gets the name. No AI is used, so names cost no tokens.
 

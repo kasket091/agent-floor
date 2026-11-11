@@ -58,7 +58,7 @@ const SETUP: Record<string, { title: string; steps: { label: string; code: strin
       { label: 'After building from source (see README), link the command', code: 'npm link' },
       { label: 'Add the hooks to ~/.claude/settings.json', code: 'agent-floor setup claude --write' },
     ],
-    note: 'Agent Floor opens by itself when a session starts. Every session starts in the Lobby and moves to that site\'s room when it touches a WordPress site; subagents walk in, get briefed, and report back.',
+    note: 'Agent Floor opens by itself when a session starts. Every session starts in the Manager\'s Office and moves to that site\'s room when it touches a WordPress site; subagents walk in, get briefed, and report back.',
   },
   codex: {
     title: 'Codex',
