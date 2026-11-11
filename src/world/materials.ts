@@ -27,7 +27,7 @@ export function clay(color: string, opts: { roughness?: number; emissive?: strin
   return m;
 }
 
-type ThemedKey = keyof Pick<WorldPalette, 'floor' | 'wall' | 'wallTrim' | 'wood' | 'woodDark' | 'metal' | 'chair' | 'screenOff'>;
+type ThemedKey = keyof Pick<WorldPalette, 'floor' | 'wall' | 'wallTrim' | 'wood' | 'woodDark' | 'metal' | 'chair' | 'screenOff' | 'lobbyLight' | 'lobbyAccent'>;
 
 const themed = new Map<ThemedKey, MeshStandardMaterial>();
 let currentTheme: ThemeName = 'light';

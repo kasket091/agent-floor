@@ -23,6 +23,9 @@ export interface WorldPalette {
   bloom: number;
   carpetLightness: number;
   carpetSaturation: number;
+  /** Lobby brand pieces (logo-wall frame, reception rug, waiting rug). Literals, not BRAND: brand.ts imports this file. */
+  lobbyLight: string;
+  lobbyAccent: string;
 }
 
 export const PALETTES: Record<ThemeName, WorldPalette> = {
@@ -46,6 +49,8 @@ export const PALETTES: Record<ThemeName, WorldPalette> = {
     bloom: 0.12,
     carpetLightness: 0.76,
     carpetSaturation: 0.45,
+    lobbyLight: '#EBE0F6',
+    lobbyAccent: '#C5A8E3',
   },
   dark: {
     sky: '#0b0e13',
@@ -67,6 +72,8 @@ export const PALETTES: Record<ThemeName, WorldPalette> = {
     bloom: 0.9,
     carpetLightness: 0.2,
     carpetSaturation: 0.22,
+    lobbyLight: '#2A1446',
+    lobbyAccent: '#3B1D63',
   },
 };
 

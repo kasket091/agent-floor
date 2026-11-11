@@ -1,6 +1,6 @@
 import { Group, MeshStandardMaterial, PlaneGeometry, Vector3, type Camera } from 'three';
 import { disposeKit, Kit } from './kit';
-import { clay, G } from './materials';
+import { clay, G, themedMat } from './materials';
 import { BRAND } from './brand';
 import { damp } from './motion';
 import { PALETTES, hash, type ThemeName } from './palette';
@@ -357,15 +357,15 @@ export class Building {
     wk.add(G.rbox(2.2, 0.12, 4.2, 0.03), this.westFrameFade, x0 - 1.1, 2.95, 0);
 
     // Logo wall, reception, waiting area.
-    wk.add(G.box(7.0, 2.6, 0.04), clay(BRAND.paleLilac, { roughness: 0.9 }), lx + 0.6, 1.6, Z0 + 0.02);
+    wk.add(G.box(7.0, 2.6, 0.04), themedMat('lobbyLight'), lx + 0.6, 1.6, Z0 + 0.02);
     wk.add(G.box(6.4, 2.2, 0.06), clay(BRAND.purple, { roughness: 0.8 }), lx + 0.6, 1.65, Z0 + 0.04);
     wk.add(new PlaneGeometry(5.6, 1.4), logoMaterial(), lx + 0.6, 1.75, Z0 + 0.075, { cast: false });
     clock(wk, lx - 3.6, 2.5, Z0 + 0.06, 0);
-    k.add(G.rbox(5.2, 0.02, 3.0, 0.02), clay(BRAND.paleLilac, { roughness: 1 }), lx + 0.6, 0.012, Z0 + 3.4, { cast: false });
+    k.add(G.rbox(5.2, 0.02, 3.0, 0.02), themedMat('lobbyLight'), lx + 0.6, 0.012, Z0 + 3.4, { cast: false });
     receptionDesk(k, lx + 0.6, Z0 + 3.6, 0, 3.2);
     plantTall(k, lx - 3.4, Z0 + 0.8, 3);
     plantTall(k, lx + 4.3, Z0 + 0.8, 0);
-    k.add(G.rbox(4.6, 0.02, 3.2, 0.02), clay(BRAND.lilac, { roughness: 1 }), lx + 0.4, 0.012, Z1 - 3.6, { cast: false });
+    k.add(G.rbox(4.6, 0.02, 3.2, 0.02), themedMat('lobbyAccent'), lx + 0.4, 0.012, Z1 - 3.6, { cast: false });
     sofa(k, lx + 0.4, Z1 - 2.3, Math.PI, 2.6, BRAND.purple);
     armchair(k, lx - 2.0, Z1 - 3.8, Math.PI / 2, '#9D6BD8');
     armchair(k, lx + 2.8, Z1 - 3.8, -Math.PI / 2, '#9D6BD8');

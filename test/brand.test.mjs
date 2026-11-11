@@ -40,3 +40,14 @@ test('carpets stay light in light mode and dark but not black in dark mode', () 
     assert.ok(l >= 0.12 && l <= 0.3, `dark carpet ${o} lightness ${l}`);
   }
 });
+
+test('lobby lilac pieces follow the theme: brand lilac by day, deep purple-ink at night', async () => {
+  const { PALETTES } = await import('../src/world/palette.ts');
+  const { BRAND } = await import('../src/world/brand.ts');
+  assert.equal(PALETTES.light.lobbyLight, BRAND.paleLilac);
+  assert.equal(PALETTES.light.lobbyAccent, BRAND.lilac);
+  for (const key of ['lobbyLight', 'lobbyAccent']) {
+    const { h, l } = new Color(PALETTES.dark[key]).getHSL({});
+    assert.ok(l < 0.3 && h * 360 >= 250 && h * 360 <= 305, `dark ${key} ${PALETTES.dark[key]}`);
+  }
+});
