@@ -12,7 +12,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { applyEvent, createState, normalizeEvent, sweep, PROTOCOL_VERSION } from '../shared/protocol.js';
-import { createClaudeIngest } from './claude-ingest.mjs';
+import { createClaudeIngest, LOBBY } from './claude-ingest.mjs';
 import { redactDeep } from './redact.mjs';
 import { DEFAULT_CONFIG, watchSites } from './sites.mjs';
 import { loadRoster, staffEvents, STAFF_ROOMS } from './staff.mjs';
@@ -64,7 +64,9 @@ export function startServer({
     return true;
   }
 
-  rooms = { type: 'rooms', rooms: STAFF_ROOMS };
+  // The Manager's Office is always shown, unless AGENT_FLOOR_TEAM makes another room the start room.
+  const fixedRooms = process.env.AGENT_FLOOR_TEAM ? STAFF_ROOMS : [LOBBY, ...STAFF_ROOMS];
+  rooms = { type: 'rooms', rooms: fixedRooms };
   ingest(rooms);
   staff.forEach(ingest);
 
@@ -74,7 +76,7 @@ export function startServer({
     (list) => {
       try {
         sites = list;
-        rooms = { type: 'rooms', rooms: [...STAFF_ROOMS, ...list.map((s) => ({ id: s.host, name: s.name }))] };
+        rooms = { type: 'rooms', rooms: [...fixedRooms, ...list.map((s) => ({ id: s.host, name: s.name }))] };
         ingest(rooms);
       } catch (err) {
         log(`Could not update site rooms: ${err.message}`);

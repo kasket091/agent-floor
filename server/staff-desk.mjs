@@ -11,6 +11,7 @@ const BY_MODEL = { haiku: 'evidence', fable: 'escalation' }; // untagged helpers
 const EXTRAS = ['Lee Pay Kho', 'Kram Evad'];
 const SPAWN_TOOLS = new Set(['Task', 'Agent']);
 const STALE_MS = 2 * 60 * 60_000;
+const PENDING_MS = 2 * 60_000; // a spawn that never linked an agent (failed or denied) by then is let go
 
 /** @returns {{ room: 'build' | 'qa-rework', tag: string, rest: string } | null} */
 export function parseTag(description) {
@@ -97,6 +98,10 @@ export function createStaffDesk({ getState }) {
         if (p.tool_use_id) byTool.set(p.tool_use_id, { w, sid, type: p.tool_input?.subagent_type || 'general-purpose' });
         out = [...out.filter((e) => e.type !== 'join'), ...wake(w, sid, lead, match.rest, now)];
       }
+    } else if (spawn && p.hook_event_name === 'PostToolUseFailure' && byTool.has(p.tool_use_id)) {
+      const { w } = byTool.get(p.tool_use_id);
+      byTool.delete(p.tool_use_id);
+      if (w.session === sid && !w.agent) home.push(...goHome(w));
     } else if (spawn && p.hook_event_name === 'PostToolUse' && byTool.has(p.tool_use_id)) {
       const { w } = byTool.get(p.tool_use_id);
       byTool.delete(p.tool_use_id);
@@ -148,7 +153,11 @@ export function createStaffDesk({ getState }) {
     route,
     /** Ids of the employees and extras working for this session, so they follow it between rooms. */
     members: (sid) => [...workers.values()].filter((w) => w.session === sid).map((w) => w.id),
-    /** Employees away for 2 hours with no event go home. */
-    tick: (now) => [...workers.values()].filter((w) => w.session && now - w.ts > STALE_MS).flatMap(goHome),
+    /** Employees away for 2 hours with no event go home; so do those whose spawn never linked an agent. */
+    tick: (now) => {
+      const gone = [...workers.values()].filter((w) => w.session && now - w.ts > (w.agent ? STALE_MS : PENDING_MS));
+      for (const [k, v] of byTool) if (gone.includes(v.w)) byTool.delete(k);
+      return gone.flatMap(goHome);
+    },
   };
 }

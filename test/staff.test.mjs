@@ -45,6 +45,7 @@ test('server start shows staff and the two rooms; reset brings them back', async
     assert.equal(Object.values(st.agents).filter((a) => a.staff).length, 22);
     assert.equal(st.teams.build.pinned, true);
     assert.equal(st.teams['qa-rework'].name, 'QA Rework');
+    assert.deepEqual([st.teams.lobby?.pinned, st.teams.lobby?.name], [true, "Manager's Office"]);
   };
   try {
     await check();

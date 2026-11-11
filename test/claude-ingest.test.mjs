@@ -315,6 +315,7 @@ test("tick moves an idle lead to the Manager's Office after 5 minutes", () => {
   const { state, ingest, feed, apply } = office();
   feed(p('PreToolUse', SITE_TOOL));
   feed(spawn('tu_1', '[build:section] Build hero'));
+  feed(launched('tu_1', AGENT_ID)); // linked, so only the 2-hour rule applies to it
   const now = Date.now();
   assert.deepEqual(ingest.tick(now), []);
   apply(ingest.tick(now + 5 * 60_000 + 5000));
@@ -381,4 +382,31 @@ test("a foreground spawn's inner tool calls show on the employee before its Post
   assert.deepEqual(helpers(state), [`${LEAD}:tu2`], 'no extra helper desk for the reviewer');
   feed(launched('tu_1', 'f1', false));
   assert.deepEqual([state.agents[REVIEWER].team, state.agents[REVIEWER].activity], ['build', 'Standby']);
+});
+
+test('a spawn that never links releases its employee after 2 minutes; extras leave', () => {
+  const { state, ingest, feed, apply } = office();
+  feed(p('PreToolUse', SITE_TOOL));
+  feed(spawn('tu_1', '[build:escalation] Hard one'));
+  const extra = feed(spawn('tu_2', '[build:escalation] Hard one again')).find((e) => e.type === 'join').agent;
+  const now = Date.now();
+  assert.deepEqual(ingest.tick(now + 60_000).filter((e) => e.agent !== LEAD), [], 'not yet');
+  apply(ingest.tick(now + 2 * 60_000 + 5000));
+  const emp = state.agents['staff:build:escalation:1'];
+  assert.deepEqual([emp.team, emp.activity], ['build', 'Standby']);
+  assert.equal(state.agents[extra].status, 'offline');
+  feed(launched('tu_1', 'late1'));
+  assert.equal(state.agents['staff:build:escalation:1'].team, 'build', 'a stale PostToolUse does not wake it');
+});
+
+test('a failed spawn releases its employee at once', () => {
+  const { state, feed } = office();
+  feed(p('PreToolUse', SITE_TOOL));
+  feed(spawn('tu_1', '[build:escalation] Hard one'));
+  assert.equal(state.agents['staff:build:escalation:1'].team, PENRITH);
+  feed(p('PostToolUseFailure', { tool_name: 'Agent', tool_use_id: 'tu_1', tool_input: { description: 'x' }, error: 'denied' }));
+  const emp = state.agents['staff:build:escalation:1'];
+  assert.deepEqual([emp.team, emp.activity], ['build', 'Standby']);
+  feed(spawn('tu_2', '[build:escalation] Retry'));
+  assert.equal(state.agents['staff:build:escalation:1'].activity, 'Retry', 'the retry gets the real employee');
 });
