@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createState } from '../shared/protocol.js';
-import { SeatBook, computeLayout, idleSpots, outing, toLocal } from '../src/world/layout.ts';
+import { SeatBook, computeLayout, idleSpots, meetingSpots, outing, toLocal } from '../src/world/layout.ts';
 
 function floor() {
   const s = createState();
@@ -38,4 +38,22 @@ test('an outing walks out of the office, along the corridor and ends on the spot
   const door = room.entry.at(-2);
   assert.ok(trip.path.some((p) => p[0] === door[0] && p[1] === door[1]));
   assert.ok(Math.hypot(...trip.path.at(0).map((v, i) => v - home.path.at(-2)[i])) < 1e-9, 'starts by stepping back from the desk');
+});
+
+test('meeting seats are 8 chairs in the meeting room, far side first, entered through its door', () => {
+  const L = floor();
+  const room = L.amenities.find((a) => a.kind === 'meeting');
+  const seats = meetingSpots(L);
+  assert.equal(seats.length, 8);
+  assert.ok(seats.every((s) => s.kind === 'meeting' && !s.stand));
+  for (const s of seats) assert.ok(Math.abs(s.x - room.rect.x) < room.rect.w / 2 && Math.abs(s.z - room.rect.z) < room.rect.d / 2, s.key);
+  // Far side (away from the corridor) first, so the first sitters face the room's glass front.
+  const fromCorridor = (s) => Math.abs(s.z);
+  assert.ok(fromCorridor(seats[0]) > fromCorridor(seats[7]));
+  // Everyone walks in through the door in the middle of the corridor wall.
+  for (const s of seats) {
+    assert.ok(Math.abs(s.route[0][0] - room.rect.x) < 1e-9 && Math.abs(s.route[0][1]) < 1e-9, 'starts in the corridor at the door');
+    assert.ok(Math.abs(s.route[1][0] - room.rect.x) < 1e-9, 'then steps through the door');
+  }
+  assert.ok(!idleSpots(L).some((s) => s.kind === 'meeting'), 'breaks never use the meeting room');
 });

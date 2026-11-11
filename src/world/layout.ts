@@ -352,11 +352,23 @@ function toWorld(frame: { x: number; z: number; yaw: number }, p: [number, numbe
   return [frame.x + p[0] * c + p[1] * s, frame.z - p[0] * s + p[1] * c];
 }
 
-export function idleSpots(L: BuildingLayout): IdleSpot[] {
+// Meeting room chairs (Building: meetingTable at z -0.3, 3.4 long, chairs at x ±0.433/±1.3, z -1.08 and 0.48).
+// Far side first (sitters face the corridor glass), centre chairs before ends. Walk in through the door at x 0,
+// round the table end for the far side.
+const DOOR_IN: [number, number] = [0, 3.6];
+const MEETING_SPOTS: LocalSpot[] = [
+  ...[-0.433, 0.433, -1.3, 1.3].map((x): LocalSpot => {
+    const lane = x < 0 ? -2.3 : 2.3;
+    return [x, -1.08, Math.PI, false, [DOOR_IN, [lane, 1.2], [lane, -1.6], [x, -1.6]]];
+  }),
+  ...[-0.433, 0.433, -1.3, 1.3].map((x): LocalSpot => [x, 0.48, 0, false, [DOOR_IN, [x, 1.2]]]),
+];
+
+function spotsIn(L: BuildingLayout, table: Partial<Record<AmenityKind, LocalSpot[]>>): IdleSpot[] {
   const out: IdleSpot[] = [];
   for (const a of L.amenities) {
     const frame = { x: a.rect.x, z: a.rect.z, yaw: a.side === 'north' ? 0 : Math.PI };
-    (LOCAL_SPOTS[a.kind] ?? []).forEach(([x, z, yaw, stand, via], i) => {
+    (table[a.kind] ?? []).forEach(([x, z, yaw, stand, via], i) => {
       const corridor: [number, number] = [via[0][0], a.rect.d / 2 + CORRIDOR / 2];
       const [wx, wz] = toWorld(frame, [x, z]);
       out.push({
@@ -372,6 +384,10 @@ export function idleSpots(L: BuildingLayout): IdleSpot[] {
   }
   return out;
 }
+
+export const idleSpots = (L: BuildingLayout) => spotsIn(L, LOCAL_SPOTS);
+/** Chairs round the meeting table, for a lead briefing new helpers. */
+export const meetingSpots = (L: BuildingLayout) => spotsIn(L, { meeting: MEETING_SPOTS });
 
 /** The trip from a desk to an idle spot, as a room-local Seat whose path starts beside the desk. */
 export function outing(room: RoomLayout, home: Seat, spot: IdleSpot): Seat {

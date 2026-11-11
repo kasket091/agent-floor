@@ -33,7 +33,7 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import type { Agent, Effect, WorldState } from '../../shared/protocol';
 import { Character, findAgentId, PICK_LAYER } from './Character';
 import { Courier } from './Courier';
-import { computeLayout, idleSpots, outing, SeatBook, type BuildingLayout, type RoomLayout } from './layout';
+import { computeLayout, idleSpots, meetingSpots, outing, SeatBook, type BuildingLayout, type RoomLayout } from './layout';
 import { Building } from './Building';
 import { setNightGlow } from './props';
 import { applyThemeToMaterials } from './materials';
@@ -53,6 +53,15 @@ interface Seated {
   idleAt?: number;
   backAt?: number;
   spot?: string;
+  /** In a briefing in the meeting room: breaks leave them alone. */
+  meeting?: boolean;
+}
+
+/** A lead briefing helpers it just started: gather once they have sat down, then everyone goes back. */
+interface Briefing {
+  members: Set<string>;
+  startBy: number;
+  until?: number;
 }
 
 export interface Anchor {
@@ -91,6 +100,7 @@ export class World {
   private courier = new Courier();
   private rooms = new Map<string, TeamRoom>();
   private agents = new Map<string, Seated>();
+  private briefings = new Map<string, Briefing>();
   private plan: BuildingLayout | null = null;
   private building = new Building();
 
@@ -283,6 +293,7 @@ export class World {
     if (prevKey !== this.plan.key) {
       // The kitchen and lounge may have moved: anyone out there goes straight back to their desk.
       for (const s of this.agents.values()) this.endOuting(s, true);
+      this.briefings.clear();
     }
 
     // Rooms
@@ -358,7 +369,7 @@ export class World {
   /** Idle leads wander to the kitchen or lounge, and come back when work starts or the break is over. */
   private wander(id: string, s: Seated, agent: Agent) {
     const c = s.character;
-    if (s.leaving || agent.parent || this.reduced || !this.plan) return;
+    if (s.leaving || s.meeting || agent.parent || this.reduced || !this.plan) return;
     const idle = agent.status === 'idle';
     if (c.isAway) {
       if (!idle || this.elapsed > (s.backAt ?? 0)) this.endOuting(s);
@@ -383,7 +394,55 @@ export class World {
     c.goOut(outing(room, home, spot));
   }
 
+  private queueBriefing(lead: string, helper: string) {
+    if (this.reduced) return;
+    let b = this.briefings.get(lead);
+    if (b?.until !== undefined) return; // already under way: late helpers just go to their desks
+    if (!b) this.briefings.set(lead, (b = { members: new Set(), startBy: this.elapsed + 10 }));
+    b.members.add(helper);
+  }
+
+  private runBriefings() {
+    for (const [lead, b] of this.briefings) {
+      const ids = [lead, ...b.members].filter((id) => {
+        const s = this.agents.get(id);
+        const st = this.state?.agents[id]?.status;
+        return s && !s.leaving && st !== 'done' && st !== 'offline';
+      });
+      if (b.until === undefined) {
+        // Wait for new helpers to reach their desks (at most ~10 s), then gather.
+        const ready = ids.every((id) => this.agents.get(id)!.character.isSeated() || this.agents.get(id)!.character.isAway);
+        if (!ready && this.elapsed < b.startBy) continue;
+        if (ids.length < 2 || !this.plan) {
+          this.briefings.delete(lead);
+          continue;
+        }
+        const taken = new Set([...this.agents.values()].map((a) => a.spot));
+        const seats = meetingSpots(this.plan).filter((p) => !taken.has(p.key));
+        for (const id of ids) {
+          const s = this.agents.get(id)!;
+          this.endOuting(s, true); // a lead on a break comes straight to the meeting
+          const room = this.layout.get(s.team);
+          const home = room?.seats.get(id);
+          const seat = seats.shift();
+          if (!room || !home || !seat) continue;
+          s.character.goOut(outing(room, home, seat), true);
+          s.spot = seat.key;
+          s.meeting = true;
+        }
+        b.until = this.elapsed + 16; // up to ~9 s walking there, then a short huddle
+      } else if (this.elapsed > b.until) {
+        for (const id of [lead, ...b.members]) {
+          const s = this.agents.get(id);
+          if (s?.meeting) this.endOuting(s);
+        }
+        this.briefings.delete(lead);
+      }
+    }
+  }
+
   private endOuting(s: Seated, instant = false) {
+    s.meeting = false;
     if (!s.character.isAway) return;
     if (instant) s.character.recall();
     else s.character.comeBack();
@@ -419,6 +478,7 @@ export class World {
   }
 
   reset() {
+    this.briefings.clear();
     for (const id of [...this.agents.keys()]) this.dropAgent(id);
     for (const r of this.rooms.values()) r.dispose();
     this.rooms.clear();
@@ -432,6 +492,7 @@ export class World {
   handleEffect(effect: Effect) {
     if (effect.kind === 'reset') return this.reset();
     if (effect.kind !== 'message') return;
+    if (this.state?.agents[effect.to]?.parent === effect.from) this.queueBriefing(effect.from, effect.to);
     const from = this.agents.get(effect.from);
     const to = this.agents.get(effect.to);
     if (!from || !to) return;
@@ -719,6 +780,7 @@ export class World {
         this.wander(id, s, agent);
       }
     }
+    this.runBriefings();
     this.building.tick(dt, this.camera);
     this.courier.update(dt);
     this.updateCamera(dt);

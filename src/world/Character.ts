@@ -282,13 +282,13 @@ export class Character {
   }
 
   /** Get up from the desk and walk to an idle spot (`trip.path` starts beside the desk). */
-  goOut(trip: Seat) {
+  goOut(trip: Seat, brisk = false) {
     if (this.mode !== 'seated' || !this.seat || this.home) return;
     this.home = this.seat;
     this.seat = trip;
     this.mode = 'walking';
     this.path = trip.path.map(([x, z]) => new Vector3(x, 0, z));
-    this.speed = WALK_SPEED;
+    this.speed = brisk ? this.paceFor(this.path) : WALK_SPEED;
   }
 
   /** Walk back the way they came and sit at the desk again. */

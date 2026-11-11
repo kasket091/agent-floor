@@ -114,6 +114,8 @@ The full event format is in [docs/protocol.md](docs/protocol.md). More integrati
 | `AGENT_FLOOR_AUTOLAUNCH` | `1` | set to `0` so hooks never open the app |
 | `AGENT_FLOOR_CLAUDE_CONFIG` | `~/.claude.json` | server: where to read WordPress MCP connections for site rooms |
 
+When a lead starts helpers, they hold a quick briefing: once the new helpers reach their desks, the lead and helpers walk to the meeting room, sit round the table for a few seconds, then go back to work.
+
 Idle leads take breaks: after a minute or two of idle, a lead may walk to the kitchen or sit on the lounge sofa, then head back after a few minutes, or straight away when work comes in. Helpers stay at their desks. Reduced-motion turns it off.
 
 This fork is branded for Digital Recipe: the lobby logo wall, purple and lilac rooms, Inter and Montserrat, and the top bar. The brand values and room-colour rules live in `src/world/brand.ts`; status colours are left alone on purpose, so "Needs you" amber never mixes with the brand.
