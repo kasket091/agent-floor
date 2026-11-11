@@ -3,6 +3,7 @@ import type { ConnectionMode } from '../core/store';
 import type { Anchor } from '../world/World';
 import { looksFor, shirtFor, sourceLabel, STATUS_COLORS, STATUS_LABEL } from '../world/palette';
 import { roomAccent } from '../world/brand';
+import { workingList } from './working';
 import { icon } from './icons';
 import { REPO_URL } from '../config';
 
@@ -101,6 +102,10 @@ export class Hud {
   private sheet = el('div', 'sheet-wrap');
   private empty = el('div', 'empty glass');
   private themeBtn: HTMLButtonElement;
+  private workBtn!: HTMLButtonElement;
+  private workPanel = el('aside', 'working glass');
+  private workOpen = false;
+  private workKey = '';
   private teamsKey = '';
   private cardKey = '';
   private state: WorldState | null = null;
@@ -126,6 +131,8 @@ export class Hud {
       tools.append(b);
       return b;
     };
+    this.workBtn = btn('users', 'Who is working (W)', () => this.toggleWorking());
+    this.workBtn.classList.add('work-btn');
     btn('cornersOut', 'Show everyone (F)', () => actions.frameAll());
     this.themeBtn = btn('moon', 'Switch theme (T)', () => actions.toggleTheme());
     btn('plug', 'Connect your agents', () => this.openSheet());
@@ -159,7 +166,8 @@ export class Hud {
 
     this.card.setAttribute('aria-live', 'polite');
     this.buildSheet();
-    this.root.append(top, this.demoNote, this.teamsDock, this.card, this.empty, hint, this.sheet);
+    this.workPanel.setAttribute('aria-label', 'Who is working');
+    this.root.append(top, this.demoNote, this.teamsDock, this.card, this.workPanel, this.empty, hint, this.sheet);
     container.append(this.root);
 
     this.bindKeys();
@@ -184,6 +192,7 @@ export class Hud {
     this.state = state;
     this.selected = selected;
     this.renderTeams();
+    this.renderWorking();
     this.renderCard();
     this.updateEmpty();
   }
@@ -195,6 +204,47 @@ export class Hud {
   private updateEmpty() {
     const count = this.state ? Object.keys(this.state.agents).length : 0;
     this.empty.classList.toggle('show', this.mode === 'live' && count === 0);
+  }
+
+  // ---------------------------------------------------------------- who is working
+
+  private toggleWorking(open = !this.workOpen) {
+    this.workOpen = open;
+    this.workPanel.classList.toggle('show', open);
+    this.workBtn.setAttribute('aria-expanded', String(open));
+    this.workKey = '';
+    this.renderWorking();
+  }
+
+  /** Badge count always; the list only while the panel is open. Reads state the page already has. */
+  private renderWorking() {
+    if (!this.state) return;
+    const s = this.state;
+    const busy = workingList(s);
+    const badge = busy.length ? `<span class="badge">${busy.length}</span>` : '';
+    this.workBtn.innerHTML = icon('users') + badge;
+    if (!this.workOpen) return;
+    const key = busy.map((a) => `${a.id}:${a.status}:${a.activity}:${a.team}`).join('|');
+    if (key === this.workKey) return;
+    this.workKey = key;
+    this.workPanel.innerHTML = `<header><h2>Who is working</h2><span class="count">${busy.length}</span></header>`;
+    if (!busy.length) {
+      this.workPanel.insertAdjacentHTML('beforeend', '<p class="none">Nobody is busy right now.</p>');
+      return;
+    }
+    const list = el('div', 'work-list');
+    for (const a of busy) {
+      const row = el('button', 'work-row') as HTMLButtonElement;
+      row.type = 'button';
+      const room = s.teams[a.team]?.name || a.team;
+      row.innerHTML = `<span class="dot" style="background:${STATUS_COLORS[a.status]}" title="${STATUS_LABEL[a.status]}"></span><span class="who-line"><b>${esc(a.name)}</b><span class="meta">${esc(a.role)} · ${esc(room)} · ${ago(a.lastSeen)}</span><span class="what">${esc(a.activity || STATUS_LABEL[a.status])}</span></span>`;
+      row.addEventListener('click', () => {
+        this.actions.select(a.id);
+        this.toggleWorking(false);
+      });
+      list.append(row);
+    }
+    this.workPanel.append(list);
   }
 
   // ---------------------------------------------------------------- teams dock
@@ -462,9 +512,11 @@ export class Hud {
       if (e.target instanceof HTMLInputElement || e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === 'Escape') {
         if (this.sheet.classList.contains('show')) this.closeSheet();
+        else if (this.workOpen) this.toggleWorking(false);
         else this.actions.select(null);
       } else if (e.key === 'f' || e.key === 'F') this.actions.frameAll();
       else if (e.key === 't' || e.key === 'T') this.actions.toggleTheme();
+      else if (e.key === 'w' || e.key === 'W') this.toggleWorking();
       else if (e.key === ']' || e.key === '[') {
         const ids = Object.values(this.state?.agents || {})
           .sort((a, b) => (this.state!.teams[a.team]?.order ?? 0) - (this.state!.teams[b.team]?.order ?? 0) || a.joinedAt - b.joinedAt)
