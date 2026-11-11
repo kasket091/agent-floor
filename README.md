@@ -114,6 +114,8 @@ The full event format is in [docs/protocol.md](docs/protocol.md). More integrati
 | `AGENT_FLOOR_AUTOLAUNCH` | `1` | set to `0` so hooks never open the app |
 | `AGENT_FLOOR_CLAUDE_CONFIG` | `~/.claude.json` | server: where to read WordPress MCP connections for site rooms |
 
+Idle leads take breaks: after a minute or two of idle, a lead may walk to the kitchen or sit on the lounge sofa, then head back after a few minutes, or straight away when work comes in. Helpers stay at their desks. Reduced-motion turns it off.
+
 Claude Code names: the first lead on the floor is **Mark Dave** (the owner, `OWNER` in `server/claude-ingest.mjs`). Each later lead and every helper gets a first name from a built-in list, picked from its id, so it keeps that name; the helper's job shows beside it. When Mark Dave's session leaves, the next new session gets the name. No AI is used, so names cost no tokens.
 
 ## Privacy and safety

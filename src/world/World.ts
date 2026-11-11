@@ -33,7 +33,7 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import type { Agent, Effect, WorldState } from '../../shared/protocol';
 import { Character, findAgentId, PICK_LAYER } from './Character';
 import { Courier } from './Courier';
-import { computeLayout, SeatBook, type BuildingLayout, type RoomLayout } from './layout';
+import { computeLayout, idleSpots, outing, SeatBook, type BuildingLayout, type RoomLayout } from './layout';
 import { Building } from './Building';
 import { setNightGlow } from './props';
 import { applyThemeToMaterials } from './materials';
@@ -48,6 +48,10 @@ interface Seated {
   desk: Workstation;
   team: string;
   leaving: boolean;
+  /** Idle outings (seconds of `elapsed`): when to get up next, when to head back, which spot. */
+  idleAt?: number;
+  backAt?: number;
+  spot?: string;
 }
 
 export interface Anchor {
@@ -272,8 +276,13 @@ export class World {
     this.state = state;
     const instant = this.instantNext;
     this.instantNext = false;
+    const prevKey = this.plan?.key;
     this.plan = computeLayout(state, this.book);
     this.building.update(this.plan);
+    if (prevKey !== this.plan.key) {
+      // The kitchen and lounge may have moved: anyone out there goes straight back to their desk.
+      for (const s of this.agents.values()) this.endOuting(s, true);
+    }
 
     // Rooms
     for (const [id, room] of this.layout) {
@@ -345,10 +354,47 @@ export class World {
     }
   }
 
+  /** Idle leads wander to the kitchen or lounge, and come back when work starts or the break is over. */
+  private wander(id: string, s: Seated, agent: Agent) {
+    const c = s.character;
+    if (s.leaving || agent.parent || this.reduced || !this.plan) return;
+    const idle = agent.status === 'idle';
+    if (c.isAway) {
+      if (!idle || this.elapsed > (s.backAt ?? 0)) this.endOuting(s);
+      return;
+    }
+    if (!idle) {
+      s.idleAt = undefined;
+      return;
+    }
+    const nextBreak = () => this.elapsed + 45 + Math.random() * 60;
+    if (s.idleAt === undefined) s.idleAt = nextBreak();
+    if (this.elapsed < s.idleAt || !c.isSeated()) return;
+    s.idleAt = nextBreak(); // also the retry time when every spot is taken
+    const room = this.layout.get(s.team);
+    const home = room?.seats.get(id);
+    const taken = new Set([...this.agents.values()].map((a) => a.spot));
+    const free = idleSpots(this.plan).filter((p) => !taken.has(p.key));
+    if (!room || !home || !free.length) return;
+    const spot = free[Math.floor(Math.random() * free.length)];
+    s.spot = spot.key;
+    s.backAt = this.elapsed + 60 + Math.random() * 120;
+    c.goOut(outing(room, home, spot));
+  }
+
+  private endOuting(s: Seated, instant = false) {
+    if (!s.character.isAway) return;
+    if (instant) s.character.recall();
+    else s.character.comeBack();
+    s.spot = undefined;
+    s.idleAt = undefined;
+  }
+
   private depart(id: string) {
     const s = this.agents.get(id);
     if (!s || s.leaving) return;
     s.leaving = true;
+    s.spot = undefined;
     const room = this.layout.get(s.team);
     // Walk back out the way they came: through the office door, down the corridor, out the front.
     const exit: [number, number][] = room ? [...room.entry].reverse() : [[0, 6]];
@@ -669,6 +715,7 @@ export class World {
         const near = this.screenBudget > 0 && this.isNear(s.character.root);
         if (near) this.screenBudget--;
         s.desk.update(dt, this.elapsed, agent, dark, s.character.isSeated(), s.character.root.rotation.y, near);
+        this.wander(id, s, agent);
       }
     }
     this.building.tick(dt, this.camera);

@@ -104,6 +104,7 @@ export class Character {
   private seat: Seat | null = null;
   private status: Status = 'idle';
   private sitAmount = 1; // 1 seated, 0 standing
+  private home: Seat | null = null; // the desk, while out on an idle outing
   private walkPhase = 0;
   private blinkAt = 0;
   private lookTarget: Vector3 | null = null;
@@ -240,6 +241,10 @@ export class Character {
   // ---------------------------------------------------------------- commands
 
   setSeat(seat: Seat, instant = false) {
+    if (this.home) {
+      this.home = seat; // away from the desk: keep the outing, update where to come back to
+      return;
+    }
     this.seat = seat;
     if (instant) {
       this.mode = 'seated';
@@ -262,6 +267,49 @@ export class Character {
     this.speed = this.paceFor(this.path);
   }
 
+  /** True while on an idle outing (walking there, there, or not yet back). */
+  get isAway() {
+    return this.home !== null;
+  }
+
+  /** Get up from the desk and walk to an idle spot (`trip.path` starts beside the desk). */
+  goOut(trip: Seat) {
+    if (this.mode !== 'seated' || !this.seat || this.home) return;
+    this.home = this.seat;
+    this.seat = trip;
+    this.mode = 'walking';
+    this.path = trip.path.map(([x, z]) => new Vector3(x, 0, z));
+    this.speed = WALK_SPEED;
+  }
+
+  /** Walk back the way they came and sit at the desk again. */
+  comeBack() {
+    if (!this.home || this.mode === 'leaving' || this.mode === 'gone') return;
+    const home = this.home;
+    const back = this.retrace();
+    this.mode = 'walking';
+    this.path = [...back, [home.x, home.z] as [number, number]].map(([x, z]) => new Vector3(x, 0, z));
+    this.speed = this.paceFor(this.path);
+  }
+
+  /** The building changed shape: drop the outing and slide straight back to the desk. */
+  recall() {
+    if (!this.home || this.mode === 'leaving' || this.mode === 'gone') return;
+    this.seat = this.home;
+    this.home = null;
+    this.mode = 'seated';
+    this.path = [];
+  }
+
+  /** Points already walked on the outing, newest first, so the way back never cuts through a wall. Ends the outing. */
+  private retrace(): [number, number][] {
+    const trip = this.seat!;
+    const reached = this.mode === 'walking' ? trip.path.length - this.path.length : trip.path.length;
+    this.seat = this.home;
+    this.home = null;
+    return trip.path.slice(0, reached).reverse();
+  }
+
   /** Long trips are walked briskly so arrivals never take more than ~9 s. */
   private paceFor(path: Vector3[]) {
     let len = 0;
@@ -276,10 +324,11 @@ export class Character {
   /** Stand up and walk out along `exit` (office door, corridor, front door). */
   leave(exit: [number, number][], onGone: () => void) {
     if (this.mode === 'leaving' || this.mode === 'gone') return;
+    const out = this.home ? this.retrace() : []; // before the mode changes: retrace reads it
     this.mode = 'leaving';
     this.onGone = onGone;
     const back = this.seat ? [...this.seat.path].reverse().slice(1) : [];
-    this.path = [...back, ...exit].map(([x, z]) => new Vector3(x, 0, z));
+    this.path = [...out, ...back, ...exit].map(([x, z]) => new Vector3(x, 0, z));
     this.speed = this.paceFor(this.path);
   }
 
@@ -362,7 +411,7 @@ export class Character {
     }
 
     // Standing up / sitting down
-    const wantSit = this.mode === 'seated' ? 1 : 0;
+    const wantSit = this.mode === 'seated' && !this.seat?.stand ? 1 : 0;
     if (this.mode === 'seated' && this.seat) {
       // Slide onto the chair and turn to the desk.
       const pos = this.root.position;
@@ -493,7 +542,7 @@ export class Character {
   }
 
   isSeated() {
-    return this.mode === 'seated' && this.sitAmount > 0.6;
+    return this.mode === 'seated' && this.sitAmount > 0.6 && !this.home;
   }
 
   dispose() {

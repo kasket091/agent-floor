@@ -40,6 +40,8 @@ export interface Seat {
   /** Room-local path from the office door to the seat. Last point is the seat. */
   path: [number, number][];
   isLead: boolean;
+  /** Stand here instead of sitting (idle spots by a counter). */
+  stand?: boolean;
 }
 
 export interface RoomLayout {
@@ -309,4 +311,75 @@ export function computeLayout(state: WorldState, book: SeatBook): BuildingLayout
     entrance,
     key,
   };
+}
+
+// ---------------------------------------------------------------- idle outings
+
+/** A place an idle lead can wander to. World space; `route` runs from the corridor to the spot. */
+export interface IdleSpot {
+  key: string;
+  kind: AmenityKind;
+  x: number;
+  z: number;
+  /** Facing, world space (0 = facing -Z). */
+  yaw: number;
+  stand: boolean;
+  route: [number, number][];
+}
+
+// Amenity-local spots matching the furniture in Building.furnishAmenity: [x, z, yaw, stand, via...].
+// Local +Z faces the corridor. `via` keeps walkers clear of tables and the TV.
+type LocalSpot = [number, number, number, boolean, [number, number][]];
+const LOUNGE_RX = 0.2; // the lounge set's x offset in Building
+const SOFA_Z = -2.0;
+const LOCAL_SPOTS: Partial<Record<AmenityKind, LocalSpot[]>> = {
+  kitchen: [
+    [-0.9, 0.25, 0, true, [[0, 1.0]]],
+    [0.3, 0.25, 0, true, [[0, 1.0]]],
+    [-2.2, -3.0, 0, true, [[1.6, 0.6], [1.6, -3.0]]],
+    [-0.9, -3.0, 0, true, [[1.6, 0.6], [1.6, -3.0]]],
+    [0.4, -3.0, 0, true, [[1.6, 0.6], [1.6, -3.0]]],
+  ],
+  lounge: [-0.94, -0.31, 0.31, 0.94].map((dx): LocalSpot => {
+    const lane = LOUNGE_RX + (dx < 0 ? -1.5 : 1.5);
+    return [LOUNGE_RX + dx, SOFA_Z, Math.PI, false, [[lane, 1.0], [lane, -1.45]]];
+  }),
+};
+
+function toWorld(frame: { x: number; z: number; yaw: number }, p: [number, number]): [number, number] {
+  const c = Math.cos(frame.yaw);
+  const s = Math.sin(frame.yaw);
+  return [frame.x + p[0] * c + p[1] * s, frame.z - p[0] * s + p[1] * c];
+}
+
+export function idleSpots(L: BuildingLayout): IdleSpot[] {
+  const out: IdleSpot[] = [];
+  for (const a of L.amenities) {
+    const frame = { x: a.rect.x, z: a.rect.z, yaw: a.side === 'north' ? 0 : Math.PI };
+    (LOCAL_SPOTS[a.kind] ?? []).forEach(([x, z, yaw, stand, via], i) => {
+      const corridor: [number, number] = [via[0][0], a.rect.d / 2 + CORRIDOR / 2];
+      const [wx, wz] = toWorld(frame, [x, z]);
+      out.push({
+        key: `${a.side}:${a.kind}:${i}`,
+        kind: a.kind,
+        x: wx,
+        z: wz,
+        yaw: yaw + frame.yaw,
+        stand,
+        route: [corridor, ...via, [x, z] as [number, number]].map((p) => toWorld(frame, p)),
+      });
+    });
+  }
+  return out;
+}
+
+/** The trip from a desk to an idle spot, as a room-local Seat whose path starts beside the desk. */
+export function outing(room: RoomLayout, home: Seat, spot: IdleSpot): Seat {
+  const path: [number, number][] = [
+    ...[...home.path].reverse().slice(1),
+    room.entry[room.entry.length - 2],
+    ...spot.route.map((p) => toLocal(room, p)),
+  ];
+  const [x, z] = path[path.length - 1];
+  return { x, z, yaw: spot.yaw - room.yaw, path, isLead: false, stand: spot.stand };
 }
