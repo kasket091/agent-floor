@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createState } from '../shared/protocol.js';
-import { SeatBook, computeLayout, idleSpots, meetingSpots, outing, toLocal } from '../src/world/layout.ts';
+import { SeatBook, computeLayout, idleSpots, meetingSpots, outing, toLocal, transferPath } from '../src/world/layout.ts';
 
 function floor() {
   const s = createState();
@@ -56,4 +56,37 @@ test('meeting seats are 8 chairs in the meeting room, far side first, entered th
     assert.ok(Math.abs(s.route[1][0] - room.rect.x) < 1e-9, 'then steps through the door');
   }
   assert.ok(!idleSpots(L).some((s) => s.kind === 'meeting'), 'breaks never use the meeting room');
+});
+
+test('transferPath leaves through the old door, walks the corridor and ends on the new seat', () => {
+  const s = createState();
+  s.teams.build = { id: 'build', name: 'Build', hue: 30, order: 0, createdAt: 0 };
+  s.teams.site = { id: 'site', name: 'Site', hue: 200, order: 1, createdAt: 0 };
+  s.agents.e = { id: 'e', name: 'Ann', role: 'Builder', team: 'build', source: 'claude-code', status: 'idle', joinedAt: 0, lastSeen: 0, history: [] };
+  s.agents.l = { id: 'l', name: 'Mia', role: 'Lead', team: 'site', source: 'claude-code', status: 'idle', joinedAt: 0, lastSeen: 0, history: [] };
+  const before = computeLayout(s, new SeatBook());
+  const from = before.rooms.get('build');
+  const fromSeat = from.seats.get('e');
+  s.agents.e.team = 'site';
+  const after = computeLayout(s, new SeatBook());
+  const to = after.rooms.get('site');
+  const toSeat = to.seats.get('e');
+  const path = transferPath(from, fromSeat, to, toSeat);
+  const world = ([x, z]) => {
+    const c = Math.cos(to.yaw), sn = Math.sin(to.yaw);
+    return [to.x + x * c + z * sn, to.z - x * sn + z * c];
+  };
+  const near = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]) < 1e-6;
+  // Starts by stepping back from the old desk (in world space).
+  const step = fromSeat.path.at(-2);
+  const fc = Math.cos(from.yaw), fs = Math.sin(from.yaw);
+  const stepWorld = [from.x + step[0] * fc + step[1] * fs, from.z - step[0] * fs + step[1] * fc];
+  assert.ok(near(world(path[0]), stepWorld), 'starts beside the old seat');
+  // Through each door's corridor point (world z = 0).
+  const corridor = path.map(world).filter((p) => Math.abs(p[1]) < 1e-6);
+  const fromDoor = toLocal({ x: 0, z: 0, yaw: 0 }, [from.x + (from.yaw === 0 ? from.doorX : -from.doorX), 0]);
+  const toDoor = [to.x + (to.yaw === 0 ? to.doorX : -to.doorX), 0];
+  assert.ok(corridor.some((p) => near(p, fromDoor)), 'out of the old door');
+  assert.ok(corridor.some((p) => near(p, toDoor)), 'in at the new door');
+  assert.ok(near(path.at(-1), [toSeat.x, toSeat.z]), 'ends on the new seat (destination-local)');
 });

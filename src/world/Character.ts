@@ -276,6 +276,16 @@ export class Character {
     this.speed = this.paceFor(this.path);
   }
 
+  /** Moved to another room: stand up and walk `path` (new room's frame, starts beside the old desk) to `seat`. */
+  transfer(path: [number, number][], seat: Seat) {
+    if (this.mode === 'leaving' || this.mode === 'gone') return;
+    this.home = null;
+    this.seat = seat;
+    this.mode = 'walking';
+    this.path = path.map(([x, z]) => new Vector3(x, 0, z));
+    this.speed = this.paceFor(this.path);
+  }
+
   /** True while on an idle outing (walking there, there, or not yet back). */
   get isAway() {
     return this.home !== null;

@@ -399,3 +399,9 @@ export function outing(room: RoomLayout, home: Seat, spot: IdleSpot): Seat {
   const [x, z] = path[path.length - 1];
   return { x, z, yaw: spot.yaw - room.yaw, path, isLead: false, stand: spot.stand };
 }
+
+/** Desk to desk between two offices: out of the old door, along the corridor, in at the new door. Destination-local. */
+export function transferPath(from: RoomLayout, fromSeat: Seat, to: RoomLayout, toSeat: Seat): [number, number][] {
+  const out = [...[...fromSeat.path].reverse().slice(1), from.entry[from.entry.length - 2]];
+  return [...out.map((p) => toLocal(to, toWorld(from, p))), to.entry[to.entry.length - 2], ...toSeat.path];
+}

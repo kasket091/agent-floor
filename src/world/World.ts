@@ -33,7 +33,7 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import type { Agent, Effect, WorldState } from '../../shared/protocol';
 import { Character, findAgentId, PICK_LAYER } from './Character';
 import { Courier } from './Courier';
-import { computeLayout, idleSpots, meetingSpots, outing, SeatBook, type BuildingLayout, type RoomLayout } from './layout';
+import { computeLayout, idleSpots, meetingSpots, outing, SeatBook, transferPath, type BuildingLayout, type RoomLayout, type Seat } from './layout';
 import { Building } from './Building';
 import { setNightGlow } from './props';
 import { applyThemeToMaterials } from './materials';
@@ -287,7 +287,8 @@ export class World {
     this.state = state;
     const instant = this.instantNext;
     this.instantNext = false;
-    const prevKey = this.plan?.key;
+    const prev = this.plan;
+    const prevKey = prev?.key;
     this.plan = computeLayout(state, this.book);
     this.building.update(this.plan);
     if (prevKey !== this.plan.key) {
@@ -313,7 +314,7 @@ export class World {
       const seat = room?.seats.get(agent.id);
       if (!room || !seat) continue;
       let s = this.agents.get(agent.id);
-      if (s && s.team !== agent.team) {
+      if (s && s.team !== agent.team && !this.transfer(agent, s, prev, room, seat, instant)) {
         this.dropAgent(agent.id);
         s = undefined;
       }
@@ -369,7 +370,7 @@ export class World {
   /** Idle leads wander to the kitchen or lounge, and come back when work starts or the break is over. */
   private wander(id: string, s: Seated, agent: Agent) {
     const c = s.character;
-    if (s.leaving || s.meeting || agent.parent || this.reduced || !this.plan) return;
+    if (s.leaving || s.meeting || agent.parent || agent.staff || this.reduced || !this.plan) return;
     const idle = agent.status === 'idle';
     if (c.isAway) {
       if (!idle || this.elapsed > (s.backAt ?? 0)) this.endOuting(s);
@@ -450,6 +451,29 @@ export class World {
     s.idleAt = undefined;
   }
 
+  /** Moved to another team: walk desk to desk when both rooms are on the floor. False = caller re-arrives them. */
+  private transfer(agent: Agent, s: Seated, prev: BuildingLayout | null, room: RoomLayout, seat: Seat, instant: boolean) {
+    const old = prev?.rooms.get(s.team);
+    const from = this.layout.get(s.team) ?? old; // where the old room stands now
+    const fromSeat = old?.seats.get(agent.id);
+    const toObj = this.rooms.get(agent.team);
+    if (s.leaving || !from || !fromSeat || !this.rooms.has(s.team) || !toObj) return false;
+    this.endOuting(s, true);
+    s.spot = s.idleAt = s.backAt = undefined;
+    const oldTeam = s.team;
+    s.team = agent.team;
+    // The desk belongs to the room: a fresh one waits at the new seat.
+    s.desk.dispose();
+    s.desk = new Workstation(agent);
+    toObj.floor.add(s.desk.root);
+    s.desk.setSeat(seat, true);
+    toObj.floor.attach(s.character.root); // keeps the world position
+    if (instant || this.reduced) s.character.setSeat(seat, true);
+    else s.character.transfer(transferPath(from, fromSeat, room, seat), seat);
+    this.pruneRoom(oldTeam);
+    return true;
+  }
+
   private depart(id: string) {
     const s = this.agents.get(id);
     if (!s || s.leaving) return;
@@ -469,8 +493,11 @@ export class World {
     s.desk.dispose();
     this.agents.delete(id);
     if (this.selected === id) this.cb.onPick(null, null);
-    // Remove empty rooms once everyone has walked out.
-    const team = s.team;
+    this.pruneRoom(s.team);
+  }
+
+  /** Remove empty rooms once everyone has walked out. */
+  private pruneRoom(team: string) {
     if (![...this.agents.values()].some((a) => a.team === team) && !this.layout.has(team)) {
       this.rooms.get(team)?.dispose();
       this.rooms.delete(team);
