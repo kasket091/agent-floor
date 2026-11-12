@@ -124,6 +124,8 @@ export function shirtFor(role: string) {
 const OWNER_NAME = 'Mark Dave';
 
 export function looksFor(id: string, name?: string) {
+  // The front desk receptionist: fair skin, long dark hair (hairStyle 6, used by no one else).
+  if (id === 'front-desk') return { skin: '#f6d5bd', hair: '#2b1d16', hairStyle: 6, glasses: false, pants: '#2b2f3a' };
   if (name === OWNER_NAME) return { skin: '#f6d5bd', hair: '#1f1a17', hairStyle: 5, glasses: false, pants: '#2b2f3a' };
   const h = hash(id);
   return {

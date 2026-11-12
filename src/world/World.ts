@@ -42,6 +42,7 @@ import { prefersReducedMotion } from './motion';
 import { REC } from './quality';
 import { PALETTES, type ThemeName } from './palette';
 import { BRAND, roomAccent } from './brand';
+import { Screens, screensOn } from './screens';
 import { TeamRoom } from './TeamRoom';
 import { setDeskLamps, Workstation } from './Workstation';
 
@@ -63,6 +64,7 @@ interface Briefing {
   members: Set<string>;
   startBy: number;
   until?: number;
+  latest?: number;
 }
 
 export interface Anchor {
@@ -106,6 +108,10 @@ export class World {
   private pongEnds: { key: string; x: number; z: number }[] = [];
   private pongBall: Mesh | null = null;
   private pongPlayers: Seated[] = [];
+  /** Shared screens (lounge TV, meeting room charts) and the front desk receptionist, who bows at arrivals. */
+  private screens = new Screens();
+  private receptionist: Character | null = null;
+  private bowAt: number | null = null;
   private plan: BuildingLayout | null = null;
   private building = new Building();
 
@@ -300,6 +306,9 @@ export class World {
       // The kitchen and lounge may have moved: anyone out there goes straight back to their desk.
       for (const s of this.agents.values()) this.endOuting(s, true);
       this.briefings.clear();
+      this.screens.layout(this.plan);
+      if (!this.screens.root.parent) this.scene.add(this.screens.root);
+      this.placeReceptionist(this.plan);
       this.pongEnds = idleSpots(this.plan)
         .filter((p) => p.kind === 'games')
         .map((p) => ({ key: p.key, x: p.x, z: p.z }));
@@ -333,7 +342,10 @@ export class World {
         roomObj.floor.add(desk.root, character.root);
         desk.setSeat(seat, true);
         if (instant || this.reduced) character.setSeat(seat, true);
-        else character.arrive(room.entry, seat);
+        else {
+          character.arrive(room.entry, seat);
+          this.bowAt ??= this.elapsed + 2.2; // as they come past the front desk
+        }
         s = { character, desk, team: agent.team, leaving: false };
         this.agents.set(agent.id, s);
       } else {
@@ -408,6 +420,18 @@ export class World {
       const other = spots.find((p) => p.kind === 'games' && p.key !== spot.key)!;
       this.sendOnBreak(partner.s, partner.room, partner.home, other, backAt);
     }
+  }
+
+  /** Standing behind the front desk (Building: receptionDesk at (lobby x + 0.6, z0 + 3.6)), facing the lobby. */
+  private placeReceptionist(L: BuildingLayout) {
+    if (!this.receptionist) {
+      this.receptionist = new Character({ id: 'front-desk', name: 'Receptionist', role: 'Receptionist' } as Agent);
+      this.receptionist.noPick();
+      this.scene.add(this.receptionist.root);
+    }
+    const x = L.lobby.x + 1.05;
+    const z = L.z0 + 2.8;
+    this.receptionist.setSeat({ x, z, yaw: Math.PI, path: [], isLead: false, stand: true }, true);
   }
 
   private sendOnBreak(s: Seated, room: RoomLayout, home: Seat, spot: IdleSpot, backAt: number) {
@@ -495,6 +519,16 @@ export class World {
           s.meeting = true;
         }
         b.until = this.elapsed + 16; // up to ~9 s walking there, then a short huddle
+        b.latest = this.elapsed + 40;
+      } else if (
+        // Long walks: keep the huddle going until everyone has sat down for ~7 s (capped at 40 s).
+        this.elapsed < (b.latest ?? 0) &&
+        [lead, ...b.members].some((id) => {
+          const s = this.agents.get(id);
+          return s?.meeting && !s.character.atSpot;
+        })
+      ) {
+        b.until = Math.max(b.until, this.elapsed + 7);
       } else if (this.elapsed > b.until) {
         for (const id of [lead, ...b.members]) {
           const s = this.agents.get(id);
@@ -872,6 +906,15 @@ export class World {
     }
     this.runBriefings();
     this.updatePong();
+    this.receptionist?.update(dt, this.elapsed, this.reduced);
+    if (this.bowAt !== null && this.elapsed >= this.bowAt) {
+      this.receptionist?.bow();
+      this.bowAt = null;
+    }
+    this.screens.update(
+      screensOn([...this.agents.values()].map((s) => ({ spot: s.spot, meeting: s.meeting, atSpot: s.character.atSpot }))),
+      this.elapsed,
+    );
     this.building.tick(dt, this.camera);
     this.courier.update(dt);
     this.updateCamera(dt);

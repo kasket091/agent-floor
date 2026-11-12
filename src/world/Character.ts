@@ -83,6 +83,7 @@ export class Character {
   private armR = new Group();
   /** Ping-pong: swing strength 0..1 while playing, null otherwise; the paddle is made on first use. */
   private pong: number | null = null;
+  private bowAt = -10;
   private paddle: Group | null = null;
   private legL = new Group();
   private legR = new Group();
@@ -228,6 +229,7 @@ export class Character {
       k.add(G.cyl(0.272, 0.272, 0.06, 18), hair, 0, 0.06, 0.02, { rx: -0.32 });
       k.add(G.sphere(0.06, 8, 6), hair, 0, 0.29, 0.08);
     }
+    if (style === 6) this.addLongHair(k, hair);
     if (style === 5) {
       // K-pop: fluffy volume on top and curtain bangs parted in the middle over the forehead (face is -Z).
       k.add(G.sphere(0.2, 12, 8), hair, 0, 0.17, 0.0, { sx: 1.25, sy: 0.75, sz: 1.2 });
@@ -236,6 +238,13 @@ export class Character {
         k.add(G.rbox(0.07, 0.2, 0.18, 0.03), hair, side * 0.245, 0.0, -0.04);
       }
     }
+  }
+
+  private addLongHair(k: Kit, hair: Material) {
+    // Long hair down the back past the shoulders, side strands, and a soft fringe (face is -Z).
+    k.add(G.rbox(0.46, 0.6, 0.14, 0.06), hair, 0, -0.24, 0.16);
+    for (const side of [-1, 1]) k.add(G.rbox(0.08, 0.44, 0.17, 0.04), hair, side * 0.245, -0.14, 0.0);
+    k.add(G.rbox(0.36, 0.08, 0.07, 0.03), hair, 0, 0.15, -0.2, { rx: 0.25 });
   }
 
   private addGlasses(k: Kit, dark: Material) {
@@ -292,6 +301,16 @@ export class Character {
   /** True while on an idle outing (walking there, there, or not yet back). */
   get isAway() {
     return this.home !== null;
+  }
+
+  /** Not clickable (the receptionist is scenery, not an agent). */
+  noPick() {
+    this.hitbox.layers.disableAll();
+  }
+
+  /** A polite bow from the hips, about 1.6 s. */
+  bow() {
+    this.bowAt = performance.now() / 1000;
   }
 
   /** Playing ping-pong: show the paddle and swing it (0 = ready, 1 = hitting). null puts it away. */
@@ -539,8 +558,9 @@ export class Character {
 
     // Torso lean: forward when typing, back when idle.
     const breathe = Math.sin(t * 1.6 + this.phase) * 0.012 * k;
-    const lean = working ? 0.16 : idle ? -0.14 : thinking ? 0.04 : 0;
-    this.torso.rotation.x = damp(this.torso.rotation.x, -lean, 6, dt);
+    const bowing = now - this.bowAt < 1.6 ? Math.sin(((now - this.bowAt) / 1.6) * Math.PI) : 0;
+    const lean = bowing ? bowing * 0.75 : working ? 0.16 : idle ? -0.14 : thinking ? 0.04 : 0;
+    this.torso.rotation.x = damp(this.torso.rotation.x, -lean, bowing ? 14 : 6, dt);
     this.torso.scale.y = 1 + breathe;
 
     // Head: nod while typing, tilt while thinking, shake on error.
