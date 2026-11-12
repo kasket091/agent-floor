@@ -105,6 +105,7 @@ export class World {
   /** Ping-pong: the two table ends (world space) and the ball, shown only while both ends are played. */
   private pongEnds: { key: string; x: number; z: number }[] = [];
   private pongBall: Mesh | null = null;
+  private pongPlayers: Seated[] = [];
   private plan: BuildingLayout | null = null;
   private building = new Building();
 
@@ -435,8 +436,11 @@ export class World {
     const playing = players.length === 2 && players.every((s) => s?.character.atSpot);
     if (!playing) {
       if (this.pongBall) this.pongBall.visible = false;
+      for (const p of this.pongPlayers) p.character.setPong(null);
+      this.pongPlayers = [];
       return;
     }
+    this.pongPlayers = players as Seated[];
     if (!this.pongBall) {
       this.pongBall = new Mesh(new SphereGeometry(0.035, 10, 8), new MeshStandardMaterial({ color: '#ff9b4a', roughness: 0.4 }));
       this.scene.add(this.pongBall);
@@ -447,6 +451,9 @@ export class World {
     const az = a.z + (b.z - a.z) * 0.12;
     const bx = b.x + (a.x - b.x) * 0.12;
     const bz = b.z + (a.z - b.z) * 0.12;
+    // Each player swings as the ball reaches their end.
+    this.pongPlayers[0].character.setPong(Math.max(0, 1 - f / 0.25));
+    this.pongPlayers[1].character.setPong(Math.max(0, 1 - (1 - f) / 0.25));
     this.pongBall.visible = true;
     this.pongBall.position.set(ax + (bx - ax) * f, 0.82 + Math.sin(f * Math.PI) * 0.28, az + (bz - az) * f);
   }

@@ -81,6 +81,9 @@ export class Character {
   private head = new Group();
   private armL = new Group();
   private armR = new Group();
+  /** Ping-pong: swing strength 0..1 while playing, null otherwise; the paddle is made on first use. */
+  private pong: number | null = null;
+  private paddle: Group | null = null;
   private legL = new Group();
   private legR = new Group();
   private shinL = new Group();
@@ -291,6 +294,23 @@ export class Character {
     return this.home !== null;
   }
 
+  /** Playing ping-pong: show the paddle and swing it (0 = ready, 1 = hitting). null puts it away. */
+  setPong(swing: number | null) {
+    this.pong = swing;
+    if (swing !== null && !this.paddle) {
+      const p = (this.paddle = new Group());
+      p.add(new Mesh(G.cyl(0.085, 0.085, 0.016, 18), clay('#d64545')));
+      const handle = new Mesh(G.box(0.03, 0.09, 0.02), clay('#8c6a4a'));
+      handle.position.set(0, 0, 0.11);
+      handle.rotation.x = Math.PI / 2;
+      p.add(handle);
+      p.position.set(0, -0.36, -0.12);
+      p.rotation.x = Math.PI / 2;
+      this.armR.add(p);
+    }
+    if (this.paddle) this.paddle.visible = swing !== null;
+  }
+
   /** On an outing and arrived at the spot (not walking). */
   get atSpot() {
     return this.home !== null && this.mode === 'seated' && this.path.length === 0;
@@ -479,7 +499,13 @@ export class Character {
 
     // Arms
     let lx = 0, rx = 0, lz = 0, rz = 0;
-    if (moving) {
+    if (this.pong !== null && !moving) {
+      // Paddle up and ready, then a forehand sweep across the body as the ball arrives.
+      rx = 0.95 + this.pong * 0.8;
+      rz = -0.3 - this.pong * 0.7;
+      lx = 0.55;
+      lz = 0.18;
+    } else if (moving) {
       lx = -swing * 0.8;
       rx = swing * 0.8;
     } else if (working) {
