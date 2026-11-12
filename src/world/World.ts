@@ -9,6 +9,7 @@ import {
   HemisphereLight,
   Mesh,
   MeshStandardMaterial,
+  SphereGeometry,
   MOUSE,
   PCFSoftShadowMap,
   PointLight,
@@ -33,7 +34,7 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import type { Agent, Effect, WorldState } from '../../shared/protocol';
 import { Character, findAgentId, PICK_LAYER } from './Character';
 import { Courier } from './Courier';
-import { computeLayout, idleSpots, meetingSpots, outing, SeatBook, transferPath, type BuildingLayout, type RoomLayout, type Seat } from './layout';
+import { computeLayout, idleSpots, meetingSpots, outing, SeatBook, transferPath, type BuildingLayout, type IdleSpot, type RoomLayout, type Seat } from './layout';
 import { Building } from './Building';
 import { setNightGlow } from './props';
 import { applyThemeToMaterials } from './materials';
@@ -101,6 +102,9 @@ export class World {
   private rooms = new Map<string, TeamRoom>();
   private agents = new Map<string, Seated>();
   private briefings = new Map<string, Briefing>();
+  /** Ping-pong: the two table ends (world space) and the ball, shown only while both ends are played. */
+  private pongEnds: { key: string; x: number; z: number }[] = [];
+  private pongBall: Mesh | null = null;
   private plan: BuildingLayout | null = null;
   private building = new Building();
 
@@ -295,6 +299,9 @@ export class World {
       // The kitchen and lounge may have moved: anyone out there goes straight back to their desk.
       for (const s of this.agents.values()) this.endOuting(s, true);
       this.briefings.clear();
+      this.pongEnds = idleSpots(this.plan)
+        .filter((p) => p.kind === 'games')
+        .map((p) => ({ key: p.key, x: p.x, z: p.z }));
     }
 
     // Rooms
@@ -370,7 +377,7 @@ export class World {
   /** Idle leads wander to the kitchen or lounge, and come back when work starts or the break is over. */
   private wander(id: string, s: Seated, agent: Agent) {
     const c = s.character;
-    if (s.leaving || s.meeting || agent.parent || agent.staff || this.reduced || !this.plan) return;
+    if (s.leaving || s.meeting || agent.parent || this.reduced || !this.plan) return;
     const idle = agent.status === 'idle';
     if (c.isAway) {
       if (!idle || this.elapsed > (s.backAt ?? 0)) this.endOuting(s);
@@ -380,19 +387,68 @@ export class World {
       s.idleAt = undefined;
       return;
     }
-    const nextBreak = () => this.elapsed + 45 + Math.random() * 60;
+    // Standby staff are calmer than leads: 2–4 minutes before a break, leads 45–105 s.
+    const nextBreak = () => this.elapsed + (agent.staff ? 120 + Math.random() * 120 : 45 + Math.random() * 60);
     if (s.idleAt === undefined) s.idleAt = nextBreak();
     if (this.elapsed < s.idleAt || !c.isSeated()) return;
     s.idleAt = nextBreak(); // also the retry time when every spot is taken
     const room = this.layout.get(s.team);
     const home = room?.seats.get(id);
     const taken = new Set([...this.agents.values()].map((a) => a.spot));
-    const free = idleSpots(this.plan).filter((p) => !taken.has(p.key));
+    const spots = idleSpots(this.plan);
+    // Ping-pong needs two: only offered when both ends are free and someone else is free to play.
+    const partner = this.pongPartner(id, taken);
+    const free = spots.filter((p) => !taken.has(p.key) && (p.kind !== 'games' || partner));
     if (!room || !home || !free.length) return;
     const spot = free[Math.floor(Math.random() * free.length)];
+    const backAt = this.elapsed + 60 + Math.random() * 120;
+    this.sendOnBreak(s, room, home, spot, backAt);
+    if (spot.kind === 'games' && partner) {
+      const other = spots.find((p) => p.kind === 'games' && p.key !== spot.key)!;
+      this.sendOnBreak(partner.s, partner.room, partner.home, other, backAt);
+    }
+  }
+
+  private sendOnBreak(s: Seated, room: RoomLayout, home: Seat, spot: IdleSpot, backAt: number) {
     s.spot = spot.key;
-    s.backAt = this.elapsed + 60 + Math.random() * 120;
-    c.goOut(outing(room, home, spot));
+    s.backAt = backAt;
+    s.character.goOut(outing(room, home, spot));
+  }
+
+  /** Someone else idle at their desk who could take the other end of the ping-pong table. */
+  private pongPartner(id: string, taken: Set<string | undefined>) {
+    if (this.pongEnds.length !== 2 || this.pongEnds.some((e) => taken.has(e.key))) return null;
+    for (const [oid, s] of this.agents) {
+      const a = this.state?.agents[oid];
+      if (oid === id || !a || a.parent || a.status !== 'idle' || s.leaving || s.meeting || !s.character.isSeated()) continue;
+      const room = this.layout.get(s.team);
+      const home = room?.seats.get(oid);
+      if (room && home) return { s, room, home };
+    }
+    return null;
+  }
+
+  /** A ball flies over the net while both ends of the table are being played. */
+  private updatePong() {
+    const [a, b] = this.pongEnds;
+    const players = a && b ? [a, b].map((e) => [...this.agents.values()].find((s) => s.spot === e.key)) : [];
+    const playing = players.length === 2 && players.every((s) => s?.character.atSpot);
+    if (!playing) {
+      if (this.pongBall) this.pongBall.visible = false;
+      return;
+    }
+    if (!this.pongBall) {
+      this.pongBall = new Mesh(new SphereGeometry(0.035, 10, 8), new MeshStandardMaterial({ color: '#ff9b4a', roughness: 0.4 }));
+      this.scene.add(this.pongBall);
+    }
+    const t = (this.elapsed * 0.9) % 2;
+    const f = t < 1 ? t : 2 - t; // 0 → 1 → 0: there and back
+    const ax = a.x + (b.x - a.x) * 0.12;
+    const az = a.z + (b.z - a.z) * 0.12;
+    const bx = b.x + (a.x - b.x) * 0.12;
+    const bz = b.z + (a.z - b.z) * 0.12;
+    this.pongBall.visible = true;
+    this.pongBall.position.set(ax + (bx - ax) * f, 0.82 + Math.sin(f * Math.PI) * 0.28, az + (bz - az) * f);
   }
 
   private queueBriefing(lead: string, helper: string) {
@@ -808,6 +864,7 @@ export class World {
       }
     }
     this.runBriefings();
+    this.updatePong();
     this.building.tick(dt, this.camera);
     this.courier.update(dt);
     this.updateCamera(dt);

@@ -116,7 +116,7 @@ The full event format is in [docs/protocol.md](docs/protocol.md). More integrati
 
 When a lead starts helpers, they hold a quick briefing: once the new helpers reach their desks, the lead and helpers walk to the meeting room, sit round the table for a few seconds, then go back to work.
 
-Idle leads take breaks: after a minute or two of idle, a lead may walk to the kitchen or sit on the lounge sofa, then head back after a few minutes, or straight away when work comes in. Helpers stay at their desks. Reduced-motion turns it off.
+Idle leads and standby staff take breaks: leads after a minute or two, staff after 2–4 minutes. They sit on the front desk couch and armchairs, at the kitchen tables or counter, or in the lounge, or two of them play ping-pong while the games room has its table, then head back after a few minutes, or straight away when work comes in. Temps and helpers stay at their desks. Reduced-motion turns it off.
 
 This fork is branded for Digital Recipe: the lobby logo wall, purple and lilac rooms, Inter and Montserrat, and the top bar. The brand values and room-colour rules live in `src/world/brand.ts`; status colours are left alone on purpose, so "Needs you" amber never mixes with the brand.
 

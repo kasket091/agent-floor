@@ -18,7 +18,7 @@ test('idle spots are in the kitchen and lounge, each with its own key', () => {
   assert.equal(new Set(spots.map((s) => s.key)).size, spots.length);
   assert.ok(spots.some((s) => !s.stand), 'some spots are sofa seats');
   for (const s of spots) {
-    const a = L.amenities.find((x) => x.kind === s.kind);
+    const a = s.kind === 'lobby' ? { rect: L.lobby } : L.amenities.find((x) => x.kind === s.kind);
     assert.ok(Math.abs(s.x - a.rect.x) <= a.rect.w / 2 && Math.abs(s.z - a.rect.z) <= a.rect.d / 2, `${s.key} is inside its room`);
   }
 });
@@ -89,4 +89,31 @@ test('transferPath leaves through the old door, walks the corridor and ends on t
   assert.ok(corridor.some((p) => near(p, fromDoor)), 'out of the old door');
   assert.ok(corridor.some((p) => near(p, toDoor)), 'in at the new door');
   assert.ok(near(path.at(-1), [toSeat.x, toSeat.z]), 'ends on the new seat (destination-local)');
+});
+
+test('break spots: 5 by the front desk, 6 at kitchen tables, 2 lounge armchairs, all seats', () => {
+  const L = floor();
+  const spots = idleSpots(L);
+  const lobby = spots.filter((s) => s.kind === 'lobby');
+  assert.equal(lobby.length, 5);
+  for (const s of lobby) {
+    assert.ok(!s.stand, `${s.key} is a seat`);
+    assert.ok(Math.abs(s.x - L.lobby.x) < L.lobby.w / 2 && Math.abs(s.z - L.lobby.z) < L.lobby.d / 2, `${s.key} is in the lobby`);
+    assert.ok(Math.abs(s.route[0][1]) < 1e-9, 'starts in the corridor');
+  }
+  assert.equal(spots.filter((s) => s.kind === 'kitchen' && !s.stand).length, 6);
+  assert.equal(spots.filter((s) => s.kind === 'kitchen' && s.stand).length, 5);
+  assert.equal(spots.filter((s) => s.kind === 'lounge').length, 6);
+  assert.equal(new Set(spots.map((s) => s.key)).size, spots.length);
+});
+
+test('ping-pong ends face each other across the table when the games room has one', () => {
+  const L = floor();
+  const games = L.amenities.find((a) => a.kind === 'games');
+  const ends = idleSpots(L).filter((s) => s.kind === 'games');
+  if (!games || games.rect.w <= 5.2) return assert.equal(ends.length, 0);
+  assert.equal(ends.length, 2);
+  assert.ok(ends.every((s) => s.stand));
+  assert.ok(Math.abs(Math.abs(ends[0].yaw - ends[1].yaw) - Math.PI) < 1e-9, 'facing each other');
+  assert.ok(Math.hypot(ends[0].x - ends[1].x, ends[0].z - ends[1].z) > 3, 'at opposite ends');
 });

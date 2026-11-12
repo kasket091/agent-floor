@@ -291,6 +291,11 @@ export class Character {
     return this.home !== null;
   }
 
+  /** On an outing and arrived at the spot (not walking). */
+  get atSpot() {
+    return this.home !== null && this.mode === 'seated' && this.path.length === 0;
+  }
+
   /** Get up from the desk and walk to an idle spot (`trip.path` starts beside the desk). */
   goOut(trip: Seat, brisk = false) {
     if (this.mode !== 'seated' || !this.seat || this.home) return;

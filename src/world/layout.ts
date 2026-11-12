@@ -318,7 +318,7 @@ export function computeLayout(state: WorldState, book: SeatBook): BuildingLayout
 /** A place an idle lead can wander to. World space; `route` runs from the corridor to the spot. */
 export interface IdleSpot {
   key: string;
-  kind: AmenityKind;
+  kind: AmenityKind | 'lobby';
   x: number;
   z: number;
   /** Facing, world space (0 = facing -Z). */
@@ -340,11 +340,31 @@ const LOCAL_SPOTS: Partial<Record<AmenityKind, LocalSpot[]>> = {
     [-0.9, -3.0, 0, true, [[1.6, 0.6], [1.6, -3.0]]],
     [0.4, -3.0, 0, true, [[1.6, 0.6], [1.6, -3.0]]],
   ],
-  lounge: [-0.94, -0.31, 0.31, 0.94].map((dx): LocalSpot => {
-    const lane = LOUNGE_RX + (dx < 0 ? -1.5 : 1.5);
-    return [LOUNGE_RX + dx, SOFA_Z, Math.PI, false, [[lane, 1.0], [lane, -1.45]]];
-  }),
+  lounge: [
+    ...[-0.94, -0.31, 0.31, 0.94].map((dx): LocalSpot => {
+      const lane = LOUNGE_RX + (dx < 0 ? -1.5 : 1.5);
+      return [LOUNGE_RX + dx, SOFA_Z, Math.PI, false, [[lane, 1.0], [lane, -1.45]]];
+    }),
+    // Armchairs either side of the coffee table: the left one faces +X, the right one -X.
+    [LOUNGE_RX - 2.24, -0.2, -Math.PI / 2, false, [[LOUNGE_RX - 1.5, 1.0], [LOUNGE_RX - 1.5, -0.2]]],
+    [LOUNGE_RX + 2.54, -0.2, Math.PI / 2, false, [[LOUNGE_RX + 1.9, 1.0], [LOUNGE_RX + 1.9, -0.2]]],
+  ],
+  // Ping-pong (Building: pingPong at z -0.4, 2.74 long along X): one player at each end, facing the net.
+  games: [
+    [-1.75, -0.4, -Math.PI / 2, true, [[0, 1.5], [-1.75, 1.5]]],
+    [1.75, -0.4, Math.PI / 2, true, [[0, 1.5], [1.75, 1.5]]],
+  ],
 };
+
+// Kitchen round tables (Building: roundTable at (-w/2+1.5, 2.2) and (w/2-1.5, 2.0), 3 chairs each at
+// angle i*2π/3 + 0.4, radius 0.72). Sit facing the table; walk in from just outside the chair.
+for (const [tx, tz] of [[-KITCHEN_W / 2 + 1.5, 2.2], [KITCHEN_W / 2 - 1.5, 2.0]]) {
+  for (let i = 0; i < 3; i++) {
+    const a = (i / 3) * Math.PI * 2 + 0.4;
+    const out: [number, number] = [tx + Math.cos(a) * 1.3, tz + Math.sin(a) * 1.3];
+    LOCAL_SPOTS.kitchen!.push([tx + Math.cos(a) * 0.68, tz + Math.sin(a) * 0.68, Math.atan2(Math.cos(a), Math.sin(a)), false, [out]]);
+  }
+}
 
 function toWorld(frame: { x: number; z: number; yaw: number }, p: [number, number]): [number, number] {
   const c = Math.cos(frame.yaw);
@@ -367,6 +387,7 @@ const MEETING_SPOTS: LocalSpot[] = [
 function spotsIn(L: BuildingLayout, table: Partial<Record<AmenityKind, LocalSpot[]>>): IdleSpot[] {
   const out: IdleSpot[] = [];
   for (const a of L.amenities) {
+    if (a.kind === 'games' && a.rect.w <= 5.2) continue; // narrow games rooms have no ping-pong table
     const frame = { x: a.rect.x, z: a.rect.z, yaw: a.side === 'north' ? 0 : Math.PI };
     (table[a.kind] ?? []).forEach(([x, z, yaw, stand, via], i) => {
       const corridor: [number, number] = [via[0][0], a.rect.d / 2 + CORRIDOR / 2];
@@ -385,7 +406,29 @@ function spotsIn(L: BuildingLayout, table: Partial<Record<AmenityKind, LocalSpot
   return out;
 }
 
-export const idleSpots = (L: BuildingLayout) => spotsIn(L, LOCAL_SPOTS);
+/** The front desk waiting area (Building: lobby sofa at (lx+0.4, z1-2.3) facing the coffee table, armchairs at x lx-2.0 / lx+2.8). */
+function lobbySpots(L: BuildingLayout): IdleSpot[] {
+  const lx = L.lobby.x;
+  const zt = L.z1 - 3.8; // coffee table row
+  const start: [number, number] = [L.x0 + LOBBY_W - 0.5, 0];
+  const seat = (i: number, x: number, z: number, yaw: number, via: [number, number][]): IdleSpot => ({
+    key: `lobby:${i}`,
+    kind: 'lobby',
+    x,
+    z,
+    yaw,
+    stand: false,
+    route: [start, ...via, [x, z]],
+  });
+  const sofaZ = L.z1 - 2.38;
+  return [
+    ...[-0.767, 0, 0.767].map((dx, i) => seat(i, lx + 0.4 + dx, sofaZ, 0, [[lx + 1.8, L.z1 - 3.05], [lx + 0.4 + dx, L.z1 - 3.05]])),
+    seat(3, lx - 1.94, zt, -Math.PI / 2, [[lx - 1.2, L.z1 - 5.0], [lx - 1.2, zt]]),
+    seat(4, lx + 2.74, zt, Math.PI / 2, [[lx + 2.0, L.z1 - 5.0], [lx + 2.0, zt]]),
+  ];
+}
+
+export const idleSpots = (L: BuildingLayout) => [...spotsIn(L, LOCAL_SPOTS), ...lobbySpots(L)];
 /** Chairs round the meeting table, for a lead briefing new helpers. */
 export const meetingSpots = (L: BuildingLayout) => spotsIn(L, { meeting: MEETING_SPOTS });
 
